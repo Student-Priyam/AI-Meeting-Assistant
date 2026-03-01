@@ -25,8 +25,21 @@ audio_file = st.sidebar.file_uploader("Upload Audio or Video", type=["mp3", "wav
 # --- CORE LOGIC ---
 @st.cache_resource
 def load_ai_models():
+    # Whisper load karna (Ye working hai)
     w_model = whisper.load_model("base")
-    s_model = pipeline("summarization", model="facebook/bart-large-cnn")
+    
+    # Summarization ke liye specific model loading
+    # Isme humne 'device' and 'framework' fix kiya hai
+    try:
+        s_model = pipeline(
+            "summarization", 
+            model="facebook/bart-large-cnn",
+            framework="pt" # Force PyTorch
+        )
+    except Exception as e:
+        st.error(f"Summarizer loading error: {e}")
+        s_model = None
+        
     return w_model, s_model
 
 if audio_file:
@@ -71,3 +84,4 @@ if audio_file:
 
 else:
     st.warning("Please upload a file to begin.")
+
