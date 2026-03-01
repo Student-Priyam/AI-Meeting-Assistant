@@ -3,108 +3,108 @@ import whisper
 from transformers import pipeline
 import os
 
-# --- 1. PAGE CONFIG & DESIGN ---
-st.set_page_config(page_title="AI Meeting Minutes Pro", page_icon="🎙️", layout="wide")
+# --- 1. PRO UI SETUP ---
+st.set_page_config(page_title="Pro Meeting AI", page_icon="💼", layout="wide")
 
+# Custom CSS for a Corporate Look
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stApp { background-color: #f4f7f6; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
-        background-color: #ffffff; border-radius: 5px; padding: 10px 20px; font-weight: bold; color: #1E3A8A;
+        background-color: white; border-radius: 8px; padding: 12px 25px; border: 1px solid #ddd;
     }
-    .stTabs [aria-selected="true"] { background-color: #1E3A8A !important; color: white !important; }
-    .action-card { padding: 15px; border-radius: 8px; background-color: #ffffff; border-left: 5px solid #1E3A8A; margin-bottom: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .task-box { 
+        padding: 20px; border-radius: 12px; background-color: white; 
+        border-left: 8px solid #007bff; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎙️ AI-Powered Meeting Assistant")
-st.markdown("*Professional Hinglish Transcription & Executive Summarization*")
-st.markdown("---")
+st.title("💼 Enterprise Meeting Intelligence")
+st.markdown("Automated Minutes, Task Extraction, and Actionable Insights")
 
-# --- 2. SMART AI LOADING ---
+# --- 2. SIDEBAR (Client Customization) ---
+st.sidebar.header("📁 Meeting Configuration")
+audio_file = st.sidebar.file_uploader("Upload Recording", type=["mp3", "wav", "m4a", "mp4"])
+
+# Client Input: Meeting Context
+meeting_context = st.sidebar.text_input("Meeting Context (Optional)", placeholder="e.g. Project Sync, Sales Pitch, UI Review")
+custom_keywords = st.sidebar.text_area("Key Terms to Track", placeholder="e.g. MediaPipe, Deadline, Budget, Priyam")
+
+# --- 3. MODEL LOADING ---
 @st.cache_resource
-def load_ai_models():
-    # Whisper Base is best for Hinglish speed/accuracy balance
+def load_pro_models():
     w_model = whisper.load_model("base")
-    # Using a reliable summarizer with explicit task definition
+    # Using a robust summarizer
     try:
         s_model = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
     except:
         s_model = None
     return w_model, s_model
 
-w_model, s_model = load_ai_models()
+w_model, s_model = load_pro_models()
 
-# --- 3. SIDEBAR ---
-st.sidebar.header("📁 Upload Meeting")
-audio_file = st.sidebar.file_uploader("Upload Audio/Video", type=["mp3", "wav", "m4a", "mp4"])
-process_btn = st.sidebar.button("🚀 Generate Minutes")
+# --- 4. SMART ANALYZER LOGIC ---
+def analyze_meeting(text, context, keywords):
+    # Professional Logic: Filter based on Intent, not just words
+    lines = text.split('.')
+    action_items = []
+    
+    # Intent-based keywords (Universal)
+    intent_words = ["will", "decided", "assign", "complete", "responsible", "deadline", "by next", "karna hai"]
+    if keywords:
+        intent_words.extend([k.strip().lower() for k in keywords.split(',')])
 
-# --- 4. DATA CLEANING LOGIC ---
-def clean_transcript(text):
-    # Fixing common Hinglish mishearings based on your specific project context
-    corrections = {
-        "pream": "Priyam",
-        "medium pipe": "MediaPipe",
-        "fast api": "FastAPI",
-        "streamlet": "Streamlit",
-        "shadyul": "Schedule",
-        "karna hai": "(Action Required)"
-    }
-    for wrong, right in corrections.items():
-        text = text.replace(wrong, right).replace(wrong.capitalize(), right)
-    return text
+    for line in lines:
+        clean_l = line.strip()
+        # Quality Check: Sentence length and Intent presence
+        if len(clean_l) > 30:
+            if any(word in clean_l.lower() for word in intent_words):
+                action_items.append(clean_l)
+                
+    return action_items
 
-# --- 5. PROCESSING ---
+# --- 5. EXECUTION ---
 if audio_file:
     with open("temp_file", "wb") as f:
         f.write(audio_file.getbuffer())
 
-    if process_btn:
-        with st.spinner("🤖 AI is analyzing the meeting..."):
+    if st.sidebar.button("🚀 Run Analysis"):
+        with st.spinner("🤖 AI is synthesizing meeting data..."):
             # A. Transcription
             result = w_model.transcribe("temp_file")
-            raw_text = result["text"]
-            text = clean_transcript(raw_text) # Apply Smart Cleaning
+            text = result["text"]
 
-            # B. Professional Summarization
-            if s_model and len(text) > 50:
-                # We give the AI a clear instruction to avoid empty outputs
-                summary_input = f"Summarize the key decisions and objectives: {text[:2500]}"
-                summary_obj = s_model(summary_input, max_length=150, min_length=50, do_sample=False)
-                summary = summary_obj[0]['summary_text']
-            else:
-                summary = "Meeting was too short for a detailed summary. Please see action items below."
+            # B. Smart Filtering
+            final_actions = analyze_meeting(text, meeting_context, custom_keywords)
 
-            # C. Advanced Action Item Extraction
-            lines = text.split('.')
-            priority_words = ["task", "responsible", "deadline", "finish", "complete", "assign", "karna hai", "target"]
-            actions = [l.strip() for l in lines if any(k in l.lower() for k in priority_words) and len(l) > 20]
+            # C. Executive Summary
+            summary_prompt = f"Topic: {meeting_context}. Summarize decisions: {text[:2000]}"
+            summary_obj = s_model(summary_prompt, max_length=150, min_length=60, do_sample=False)
+            summary = summary_obj[0]['summary_text']
 
-            # --- 6. PROFESSIONAL UI TABS ---
-            st.success("✅ Minutes of Meeting Generated")
-            
+            # --- 6. CLIENT PRESENTATION TABS ---
             tab1, tab2, tab3 = st.tabs(["📄 Full Transcript", "📝 Executive Summary", "✅ Action Items"])
 
             with tab1:
-                st.info("Cleaned transcript with fixed project names (Priyam, MediaPipe, etc.)")
-                st.text_area("", text, height=350)
+                st.text_area("Original Content", text, height=400)
 
             with tab2:
-                st.subheader("Meeting Overview")
+                st.subheader("Executive Overview")
+                st.markdown(f"> **Context:** {meeting_context if meeting_context else 'General Meeting'}")
                 st.write(summary)
-                st.markdown("---")
-                # Professional MoM download format
-                full_mom = f"MINUTES OF MEETING\n\nSUMMARY:\n{summary}\n\nACTION ITEMS:\n" + "\n".join([f"- {a}" for a in actions])
-                st.download_button("📥 Download Official MoM", full_mom, file_name="Meeting_Minutes.txt")
+                
+                # Professional Download Content
+                report = f"EXECUTIVE SUMMARY:\n{summary}\n\nACTION ITEMS:\n" + "\n".join([f"- {a}" for a in final_actions])
+                st.download_button("📥 Export Professional Report", report, file_name="Meeting_Report.txt")
 
             with tab3:
-                st.subheader("🎯 Key Tasks & Ownership")
-                if actions:
-                    for i, action in enumerate(actions, 1):
-                        st.markdown(f'<div class="action-card"><b>Task {i}:</b> {action}</div>', unsafe_allow_html=True)
+                st.subheader("🎯 Verified Deliverables")
+                if final_actions:
+                    for i, item in enumerate(final_actions, 1):
+                        st.markdown(f'<div class="task-box"><b>Deliverable {i}:</b><br>{item}</div>', unsafe_allow_html=True)
                 else:
-                    st.warning("No specific tasks identified. Ensure keywords like 'Deadline' or 'Task' are used in the audio.")
+                    st.warning("No high-intent action items found. Adjust keywords in the sidebar if needed.")
 else:
-    st.info("👈 Upload your meeting file in the sidebar to begin.")
+    st.info("Please upload a meeting recording to generate professional insights.")
