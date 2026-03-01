@@ -12,16 +12,15 @@ st.markdown("Hinglish Support | Automated Summary | Action Item Extraction")
 # --- CORE LOGIC (Stable Model Loading) ---
 @st.cache_resource
 def load_ai_models():
-    # 1. Whisper Load (Working)
+    # 1. Whisper Load
     w_model = whisper.load_model("base")
     
-    # 2. Text-Generation use karenge summarization ke liye (More Stable)
+    # 2. Text-Generation (Using a more compatible approach)
     try:
-        # Chota model use kar rahe hain taaki RAM crash na ho
+        # device_map="auto" hatakar simple loading kar rahe hain
         s_model = pipeline(
             "text-generation", 
-            model="sshleifer/distilbart-cnn-12-6",
-            device_map="auto"
+            model="sshleifer/distilbart-cnn-12-6"
         )
     except Exception as e:
         st.error(f"AI Loading Error: {e}")
@@ -80,3 +79,4 @@ if audio_file:
                     st.write("No specific action items detected.")
 else:
     st.info("👈 Please upload an audio or video file to start.")
+
