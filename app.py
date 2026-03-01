@@ -3,82 +3,71 @@ import whisper
 from transformers import pipeline
 import os
 
-# --- 1. PAGE CONFIG & UI STYLE ---
-st.set_page_config(page_title="AI Meeting Minutes", page_icon="🎙️", layout="wide")
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="AI Meeting Pro", page_icon="🚀", layout="wide")
 
+# Custom UI for Professional Look
 st.markdown("""
     <style>
-    .stApp { background-color: #f8f9fa; }
-    .main-title { color: #1E3A8A; font-size: 40px; font-weight: bold; text-align: center; }
+    .reportview-container { background: #f0f2f6; }
+    .stTable { background-color: white; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">🎙️ AI-Powered Meeting Minutes</div>', unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Hinglish Support | Automated Summary | Action Item Extraction</p>", unsafe_allow_html=True)
-st.markdown("---")
+st.title("🎙️ Next-Gen AI Meeting Assistant")
+st.info("Supported Formats: MP3, WAV, M4A, MP4 (Video)")
 
-# --- 2. SIDEBAR FOR UPLOAD ---
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/906/906334.png", width=100)
-st.sidebar.header("Upload Meeting Audio")
-audio_file = st.sidebar.file_uploader("Choose an audio file (mp3, wav)", type=["mp3", "wav", "m4a"])
+# --- SIDEBAR ---
+st.sidebar.header("Step 1: Upload Content")
+# Added mp4 and mkv support here
+audio_file = st.sidebar.file_uploader("Upload Audio or Video", type=["mp3", "wav", "m4a", "mp4", "mkv"])
 
-st.sidebar.info("Tip: 'Small' model is faster for free hosting.")
-model_size = st.sidebar.selectbox("Select Whisper Model", ["base", "small"], index=0)
+# --- CORE LOGIC ---
+@st.cache_resource
+def load_ai_models():
+    w_model = whisper.load_model("base")
+    s_model = pipeline("summarization", model="facebook/bart-large-cnn")
+    return w_model, s_model
 
-# --- 3. CORE LOGIC FUNCTIONS ---
-@st.cache_resource # Taaki model baar-baar load na ho
-def load_models(model_size):
-    st.text("Loading AI Models... Please wait.")
-    whisper_model = whisper.load_model(model_size)
-    summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-    return whisper_model, summarizer
-
-# --- 4. PROCESSING ---
 if audio_file:
-    # Save audio temporarily
-    with open("temp_audio.mp3", "wb") as f:
+    with open("temp_file", "wb") as f:
         f.write(audio_file.getbuffer())
-    
-    if st.sidebar.button("✨ Generate Minutes of Meeting"):
-        try:
-            w_model, sum_model = load_models(model_size)
-            
-            with st.spinner("🤖 AI is listening to your recording..."):
-                # Transcription
-                result = w_model.transcribe("temp_audio.mp3")
-                transcript = result["text"]
-            
-            with st.spinner("✍️ Summarizing and extracting actions..."):
-                # Summarization (limiting to 3000 chars for memory)
-                summary = sum_model(transcript[:3000], max_length=150, min_length=40, do_sample=False)[0]['summary_text']
-                
-                # Action Items Logic (Hinglish words included)
-                lines = transcript.split('.')
-                keywords = ["karna hai", "task", "responsible", "deadline", "action", "assignment", "decision"]
-                actions = [l.strip() for l in lines if any(k in l.lower() for k in keywords)]
 
-            # --- 5. TABS UI ---
-            st.success("Analysis Complete!")
-            tab1, tab2, tab3 = st.tabs(["📄 Full Transcript", "📝 Structured MoM", "✅ Action Items"])
+    if st.sidebar.button("🚀 Process Meeting Content"):
+        w_model, s_model = load_ai_models()
+        
+        with st.spinner("AI is analyzing your content..."):
+            # 1. Transcription
+            result = w_model.transcribe("temp_file")
+            text = result["text"]
 
-            with tab1:
-                st.text_area("Original Transcript", transcript, height=300)
+            # 2. Advanced Summary
+            summary = s_model(text[:2500], max_length=150, min_length=50)[0]['summary_text']
 
-            with tab2:
-                st.subheader("Minutes of Meeting")
-                mom_text = f"**Meeting Title:** AI Project Sync\n\n**Key Discussion Points:**\n{summary}"
-                st.markdown(mom_text)
-                st.download_button("📥 Download MoM", mom_text, file_name="Meeting_Minutes.txt")
+            # 3. Smart Extraction
+            lines = text.split('.')
+            act_keywords = ["task", "responsible", "karna hai", "deadline", "schedule", "meeting"]
+            actions = [l.strip() for l in lines if any(k in l.lower() for k in act_keywords)]
 
-            with tab3:
-                st.subheader("Extracted Action Items")
-                if actions:
-                    for a in actions:
-                        st.write(f"🔹 {a}")
-                else:
-                    st.write("No specific action items detected.")
+        # --- HIGH LEVEL UI TABS ---
+        tab1, tab2, tab3 = st.tabs(["📄 Transcript", "📝 Executive Summary", "✅ Action Plan"])
 
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+        with tab1:
+            st.text_area("Raw Text", text, height=300)
+
+        with tab2:
+            st.subheader("Meeting Overview")
+            st.write(summary)
+            st.download_button("Download Summary", summary, file_name="Summary.txt")
+
+        with tab3:
+            st.subheader("Task Assignments")
+            if actions:
+                # Displaying actions in a professional list
+                for i, action in enumerate(actions):
+                    st.markdown(f"**{i+1}.** {action}")
+            else:
+                st.write("No specific actions detected. Try a longer recording!")
+
 else:
-    st.warning("Please upload an audio file from the sidebar to start.")
+    st.warning("Please upload a file to begin.")
