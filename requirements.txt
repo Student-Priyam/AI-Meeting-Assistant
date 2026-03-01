@@ -2,3 +2,5 @@ streamlit
 openai-whisper
 transformers
 torch
+tf-keras
+sentencepiece
