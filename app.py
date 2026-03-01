@@ -21,13 +21,13 @@ st.markdown("""
 st.title("💼 Enterprise Meeting Intelligence")
 st.markdown("Automated Transcription, Strategic Insights, and Deliverable Tracking")
 
-# --- 2. HIGH-LEVEL LOGIC FUNCTIONS ---
+# --- 2. HIGH-LEVEL LOGIC (Industry Neutral) ---
 def get_high_level_actions(text):
     """Semantic logic to extract only high-intent commitments."""
     lines = text.split('.')
     deliverables = []
     
-    # Professional Intent Patterns: [Actor] + [Commitment] + [Action]
+    # Intent Patterns: [Actor] + [Commitment] + [Action]
     intent_patterns = [
         r"(i|we|team|everyone)\s+(will|need to|must|should|going to|tasked to)",
         r"(deadline|finish|complete|finalize|integrate|develop|send|update)",
@@ -37,14 +37,13 @@ def get_high_level_actions(text):
     for line in lines:
         clean_l = line.strip()
         if len(clean_l) > 35:
-            # Check if line matches any professional intent
             if any(re.search(p, clean_l.lower()) for p in intent_patterns):
-                # Filter out generic filler sentences
+                # Universal filter for filler sentences
                 if not any(f in clean_l.lower() for f in ["there are", "this is", "hello"]):
                     deliverables.append(clean_l)
     return deliverables
 
-# --- 3. MODELS (PRO LOADING) ---
+# --- 3. PRO MODEL LOADING ---
 @st.cache_resource
 def load_enterprise_models():
     # Whisper for Transcription
@@ -57,7 +56,11 @@ def load_enterprise_models():
     
     return w_model, tokenizer, s_model
 
-w_model, tokenizer, s_model = load_enterprise_models()
+# Handle potential loading errors gracefully for the UI
+try:
+    w_model, tokenizer, s_model = load_enterprise_models()
+except Exception as e:
+    st.error(f"Initialization Error: {e}. Please check your requirements.txt")
 
 # --- 4. INPUT SECTION ---
 st.sidebar.header("📥 Input Source")
@@ -78,7 +81,7 @@ if audio_file:
             # B. High-Level Action Extraction
             deliverables = get_high_level_actions(raw_text)
             
-            # C. Strategic Summarization (Manual Inference for Stability)
+            # C. Strategic Summarization (Direct Inference)
             inputs = tokenizer("summarize: " + raw_text[:2000], return_tensors="pt", max_length=1024, truncation=True)
             summary_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
             summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
@@ -87,7 +90,7 @@ if audio_file:
             tab1, tab2, tab3 = st.tabs(["📄 Detailed Records", "📝 Executive Insights", "🎯 Strategic Deliverables"])
 
             with tab1:
-                st.subheader("Comprehensive Meeting Transcript")
+                st.subheader("Comprehensive Meeting Record")
                 st.text_area("", raw_text, height=400)
 
             with tab2:
@@ -102,7 +105,7 @@ if audio_file:
                 st.subheader("Key Outcomes & Accountability")
                 if deliverables:
                     for i, d in enumerate(deliverables, 1):
-                        st.markdown(f'<div class="report-card"><div class="metric-text">Outcome {i}</div>{d}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="report-card"><div class="metric-text">Deliverable {i}</div>{d}</div>', unsafe_allow_html=True)
                 else:
                     st.warning("No high-intent deliverables identified.")
 else:
