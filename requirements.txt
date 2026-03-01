@@ -2,6 +2,8 @@ streamlit
 openai-whisper
 transformers
 torch
+accelerate
+
 
 
 
