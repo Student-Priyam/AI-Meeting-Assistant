@@ -1,6 +1,6 @@
 streamlit
 openai-whisper
-transformers>=4.40.0
+transformers
 torch
-tf-keras
+
 
