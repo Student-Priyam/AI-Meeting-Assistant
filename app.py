@@ -28,19 +28,28 @@ def load_ai_models():
     # Whisper load karna (Ye working hai)
     w_model = whisper.load_model("base")
     
-    # Summarization ke liye specific model loading
-    # Isme humne 'device' and 'framework' fix kiya hai
+    # Summarization fix: 'text-generation' pipeline use karein 
+    # kyuki 'summarization' task list mein missing dikh raha hai
     try:
         s_model = pipeline(
-            "summarization", 
+            "text-generation", 
             model="facebook/bart-large-cnn",
-            framework="pt" # Force PyTorch
+            device_map="auto"
         )
     except Exception as e:
-        st.error(f"Summarizer loading error: {e}")
+        st.error(f"AI Loading Error: {e}")
         s_model = None
         
     return w_model, s_model
+
+# Processing logic mein summary wali line ko aise update karein:
+if s_model:
+    # BART model ko summarize karne ke liye prompt dena padta hai
+    prompt = f"Summarize this meeting transcript: {text[:2000]}"
+    summary_output = s_model(prompt, max_length=150, min_length=50, do_sample=False)
+    summary = summary_output[0]['generated_text']
+else:
+    summary = "Summary could not be generated due to a loading error."
 
 if audio_file:
     with open("temp_file", "wb") as f:
@@ -84,4 +93,5 @@ if audio_file:
 
 else:
     st.warning("Please upload a file to begin.")
+
 
