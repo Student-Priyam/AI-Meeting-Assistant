@@ -28,13 +28,13 @@ st.title("💼 Enterprise Meeting Intelligence")
 st.markdown("Universal Audio & Video Synthesis • Strategic Insights • Deliverable Tracking")
 st.markdown("---")
 
-# --- 2. HIGH-LEVEL ANALYTICS LOGIC (Universal & Industry Neutral) ---
+# --- 2. UNIVERSAL SEMANTIC LOGIC (Industry Neutral) ---
 def extract_strategic_outcomes(text):
-    """Semantic logic to identify future commitments and key decisions."""
+    """Grammar-based logic to extract high-intent commitments."""
     lines = text.split('.')
     deliverables = []
     
-    # Universal Intent Patterns: [Actor] + [Commitment] + [Action Verb]
+    # Universal Intent Patterns: [Subject] + [Commitment] + [Action Verb]
     intent_patterns = [
         r"(i|we|team|everyone|dept|management)\s+(will|must|should|need to|tasked to|going to)",
         r"(complete|finalize|integrate|develop|send|update|post|push|optimize|verify|check|design)",
@@ -43,23 +43,23 @@ def extract_strategic_outcomes(text):
     
     for line in lines:
         clean_l = line.strip()
-        if len(clean_l) > 35:
-            # Logic: Intent hona chahiye aur generic filler nahi hona chahiye
+        if len(clean_l) > 38: # Minimum length for a professional sentence
+            # Checking for professional intent patterns
             match_score = sum(1 for p in intent_patterns if re.search(p, clean_l.lower()))
             if match_score >= 1:
-                # Filter out universal meeting intro/fillers
+                # Filter out generic introductory/filler phrases
                 fillers = ["there are", "hello", "i am", "today is", "welcome", "we are a"]
                 if not any(f in clean_l.lower() for f in fillers):
                     deliverables.append(clean_l)
     return deliverables
 
-# --- 3. PRO MODEL ARCHITECTURE (Optimized for Stability) ---
+# --- 3. PRO MODEL ARCHITECTURE (Optimized & Stable) ---
 @st.cache_resource
 def load_enterprise_engine():
-    # Whisper for Transcription (Handles video tracks natively)
+    # Whisper for robust transcription
     w_model = whisper.load_model("base")
     
-    # Direct Model Access for Summarization (Professional Standard)
+    # Direct Model Loading to avoid 'Unknown Task' errors
     model_name = "sshleifer/distilbart-cnn-12-6"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     s_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -69,23 +69,22 @@ def load_enterprise_engine():
 try:
     w_model, tokenizer, s_model = load_enterprise_engine()
 except Exception as e:
-    st.error(f"Engine Initialization Error: {e}")
+    st.error(f"Engine Initialization Error: {e}. Please check requirements.txt")
 
 # --- 4. INPUT SECTION (AUDIO & VIDEO) ---
-st.sidebar.header("📁 Input Records")
-uploaded_file = st.sidebar.file_uploader("Upload Meeting (Audio or Video)", 
+st.sidebar.header("📁 Input Source")
+uploaded_file = st.sidebar.file_uploader("Upload Recording", 
                                         type=["mp3", "wav", "m4a", "mp4", "mkv", "mov"])
 industry_context = st.sidebar.selectbox("Industry Domain", 
                                         ["Technology", "Corporate Strategy", "Operations", "Sales & Marketing", "General Management"])
 
 # --- 5. SYNTHESIS ENGINE ---
 if uploaded_file:
-    # Save temp file for processing
     temp_path = f"temp_{uploaded_file.name}"
     with open(temp_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    # UI Preview: Video or Audio Player
+    # Professional Player Preview
     if uploaded_file.type.startswith('video'):
         st.subheader("📺 Content Preview")
         st.video(uploaded_file)
@@ -95,24 +94,23 @@ if uploaded_file:
 
     if st.sidebar.button("🚀 Analyze & Generate Intelligence"):
         with st.spinner("AI is synthesizing strategic data..."):
-            # A. Transcription (Whisper handles video tracks natively)
+            # A. Transcription (Whisper handles video natively)
             result = w_model.transcribe(temp_path)
             raw_text = result["text"]
 
-            # B. Smart Outcome Extraction (Universal Semantic Logic)
+            # B. Smart Deliverable Extraction
             outcomes = extract_strategic_outcomes(raw_text)
             
-            # C. Executive Summarization (Direct Model Inference)
+            # C. Executive Summarization (Fixing 'forced_bos_token_id' warning)
             inputs = tokenizer(f"Summarize key decisions in this {industry_context} meeting: " + raw_text[:2000], 
                                return_tensors="pt", max_length=1024, truncation=True)
             
-            # logic to fix the 'forced_bos_token_id' warning
             summary_ids = s_model.generate(
                 inputs["input_ids"], 
                 max_length=150, 
                 min_length=60, 
                 length_penalty=2.0,
-                forced_bos_token_id=0
+                forced_bos_token_id=0 # Warning fix
             )
             summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
@@ -126,9 +124,9 @@ if uploaded_file:
             with tab2:
                 st.subheader("Executive Briefing")
                 st.markdown(f"**Strategic Focus:** {industry_context}")
-                st.write(summary)
+                st.info(summary)
                 
-                # Formal Report Generation
+                # Formal Report Download
                 report_text = f"EXECUTIVE SUMMARY ({industry_context})\n\nDECISIONS:\n{summary}\n\nSTRATEGIC DELIVERABLES:\n" + "\n".join([f"- {o}" for o in outcomes])
                 st.markdown("---")
                 st.download_button("📥 Export Meeting Report", report_text, file_name="Executive_MoM.txt")
@@ -137,17 +135,12 @@ if uploaded_file:
                 st.subheader("Key Outcomes & Accountability")
                 if outcomes:
                     for i, outcome in enumerate(outcomes, 1):
-                        st.markdown(f"""
-                        <div class="report-card">
-                            <div class="metric-title">Outcome {i}</div>
-                            {outcome}
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f'<div class="report-card"><div class="metric-title">Outcome {i}</div>{outcome}</div>', unsafe_allow_html=True)
                 else:
-                    st.warning("No high-intent deliverables identified. Generic statements were filtered.")
+                    st.warning("No high-intent deliverables identified. Generic filler sentences were automatically filtered.")
     
-    # Cleanup temp file to save RAM
+    # Clean up
     if os.path.exists(temp_path):
         os.remove(temp_path)
 else:
-    st.info("👈 Please upload a meeting recording (Audio or Video) to begin.")
+    st.info("👈 Please upload a meeting recording (Audio or Video) to begin synthesis.")
