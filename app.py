@@ -261,4 +261,121 @@ with tab1:
             st.write(f"Size: {uploaded_file.size / 1024:.2f} KB")
             
         if st.button("🚀 Extract Intelligence"):
-            with st.spinner("Analyzing Audio Stream & Semantic Intent
+            with st.spinner("Analyzing Audio Stream & Semantic Intent..."):
+                transcript, summary, assignments, intel = process_video(uploaded_file, mode)
+                
+                # Save to DB
+                db.save_meeting(
+                    uploaded_file.name, mode, transcript, 
+                    summary, str(assignments), str(intel)
+                )
+                
+                st.session_state['latest_result'] = {
+                    'transcript': transcript,
+                    'summary': summary,
+                    'assignments': assignments,
+                    'filename': uploaded_file.name
+                }
+                st.success("Intelligence Extraction Complete!")
+                st.rerun()
+
+# --- TAB 2: DASHBOARD (Latest Result) ---
+with tab2:
+    if 'latest_result' in st.session_state:
+        res = st.session_state['latest_result']
+        
+        # Metrics Row
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Transcript Length", f"{len(res['transcript'])} chars")
+        m2.metric("Assignments Found", len(res['assignments']))
+        m3.metric("Mode", mode)
+        
+        # Content Display
+        with st.expander("📝 Full Transcript", expanded=False):
+            st.text(res['transcript'])
+            
+        st.subheader("Executive Summary")
+        st.info(res['summary'])
+        
+        st.subheader("Action Items & Assignments")
+        if res['assignments']:
+            for item in res['assignments']:
+                st.write(f"• {item}")
+        else:
+            st.write("No explicit assignments detected via semantic analysis.")
+            
+        # PDF Export
+        pdf_data = create_pdf(res['filename'], res['summary'], res['assignments'])
+        st.download_button(
+            label="📄 Download Strategic Brief (PDF)",
+            data=pdf_data,
+            file_name=f"Strategic_Brief_{res['filename']}.pdf",
+            mime="application/pdf"
+        )
+    else:
+        st.info("Upload a video in the 'Ingest' tab to generate intelligence.")
+
+# --- TAB 3: STRATEGIC ADVISOR (RAG Q&A) ---
+with tab3:
+    st.subheader("🗣️ The Strategic Advisor")
+    st.write("Ask specific questions about the meeting. (e.g., 'What did Rahul say about the budget?')")
+    
+    # Load history for context
+    history_df = db.get_history()
+    
+    if not history_df.empty:
+        # Combine all transcripts for simple RAG search
+        all_transcripts = " ".join(history_df['transcript'].dropna().tolist())
+        
+        query = st.text_input("Ask your question:")
+        if query:
+            # Simple keyword search + context extraction (Lightweight RAG)
+            # In production, use vector embeddings here
+            sentences = all_transcripts.split('.')
+            relevant = [s.strip() for s in sentences if query.lower() in s.lower()]
+            
+            if relevant:
+                st.success("Relevant Intelligence Found:")
+                for r in relevant[:5]: # Top 5 results
+                    st.markdown(f"> {r}.")
+            else:
+                st.warning("No direct matches found in archived transcripts.")
+    else:
+        st.info("No archived meetings found. Please ingest data first.")
+
+# --- TAB 4: ARCHIVES ---
+with tab4:
+    st.subheader("📂 Interactive Archives")
+    df = db.get_history()
+    
+    if not df.empty:
+        # Searchable Grid
+        search = st.text_input("Search Archives", placeholder="Filter by name or content...")
+        if search:
+            filtered_df = df[df['filename'].str.contains(search, case=False) | 
+                             df['summary'].str.contains(search, case=False)]
+        else:
+            filtered_df = df
+            
+        for index, row in filtered_df.iterrows():
+            with st.container():
+                c1, c2, c3 = st.columns([4, 1, 1])
+                with c1:
+                    st.markdown(f"**{row['filename']}**")
+                    st.caption(f"{row['upload_date']} | Mode: {row['mode']}")
+                with c2:
+                    if st.button("View", key=f"view_{row['id']}"):
+                        st.session_state['latest_result'] = {
+                            'transcript': row['transcript'],
+                            'summary': row['summary'],
+                            'assignments': eval(row['assignments']),
+                            'filename': row['filename']
+                        }
+                        st.rerun()
+                with c3:
+                    if st.button("Delete", key=f"del_{row['id']}"):
+                        db.delete_meeting(row['id'])
+                        st.rerun()
+                st.divider()
+    else:
+        st.write("No records found.")
