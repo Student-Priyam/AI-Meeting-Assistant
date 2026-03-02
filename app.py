@@ -28,42 +28,24 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2. PREMIUM UI/UX CONFIG (FIXED CSS & SIDEBAR) ---
+# --- 2. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
 
-# THE ABSOLUTE FIX: Properly wrapped CSS to prevent code leakage
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #F8FAFC; }
-    
-    /* Sidebar Styling - Forces white text on dark background */
-    [data-testid="stSidebar"] { 
-        background-color: #0F172A !important; 
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
-    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {
-        color: #0F172A !important; /* Keep selectbox text dark for readability */
-    }
-
-    /* Hero Banner - New Bright Blue Shade */
+    [data-testid="stSidebar"] { background-color: #0F172A !important; }
+    [data-testid="stSidebar"] * { color: white !important; }
+    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div { color: #0F172A !important; }
     .hero-banner {
-        background: #005A92;
-        padding: 3rem 2rem;
-        border-radius: 16px;
-        margin-bottom: 2.5rem;
-        color: white;
+        background: #005A92; padding: 3rem 2rem; border-radius: 16px;
+        margin-bottom: 2.5rem; color: white; text-align: center;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-        text-align: center;
     }
     .hero-banner h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; color: white !important; }
     .hero-banner p { font-size: 1.1rem; color: #E0E7FF !important; }
-
-    /* Cards & Bubbles */
     .executive-card {
         background: white; padding: 2rem; border-radius: 12px; border: 1px solid #E2E8F0; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
@@ -80,6 +62,7 @@ with st.sidebar:
     st.markdown("<h2 style='text-align:center;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     
+    # Selection captured in 'm_type'
     m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Strategy Sync"])
     st.markdown("---")
     choice = st.radio("Navigation", [" Meeting Summary", " Meeting Archives"], label_visibility="collapsed")
@@ -89,13 +72,18 @@ with st.sidebar:
 
 # --- TAB 1: INTELLIGENCE SUITE ---
 if choice == " Meeting Summary":
-    st.markdown("""
+    # FIX: Dropdown Logic Integration
+    is_academic = "Academic" in m_type
+    summary_label = "📚 Core Concepts" if is_academic else "📄 Executive Summary"
+    action_label = "📝 Assignments & Deadlines" if is_academic else "🎯 Action Items"
+
+    st.markdown(f"""
     <div class="hero-banner">
         <div style="margin-bottom: 1rem;">
-            <img src="https://images.unsplash.com/opengraph/1x1.png?blend=https:%2F%2Fimages.unsplash.com%2Fphoto-1616531770192-6eaea74c2456%3Fblend%3D000000%26blend-alpha%3D10%26blend-mode%3Dnormal%26crop%3Dfaces%252Cedges%26h%3D630%26mark%3Dhttps%253A%252F%252Fimages.unsplash.com%252Fopengraph%252Fsearch-input.png%253Fh%253D84%2526txt%253Donline%252Bmeeting%2526txt-align%253Dmiddle%25252Cleft%2526txt-clip%253Dellipsis%2526txt-color%253D000000%2526txt-pad%253D80%2526txt-size%253D40%2526txt-width%253D660%2526w%253D750%2526auto%253Dformat%2526fit%253Dcrop%2526q%253D60%26mark-align%3Dmiddle%252Ccenter%26mark-w%3D750%26w%3D1200%26auto%3Dformat%26fit%3Dcrop%26q%3D60%26ixid%3DM3wxMjA3fDB8MXxzZWFyY2h8Nnx8b25saW5lJTIwbWVldGluZ3xlbnwwfHx8fDE3MTk5MDk3NjZ8MA%26ixlib%3Drb-4.0.3&blend-w=1&h=630&mark=https:%2F%2Fimages.unsplash.com%2Fopengraph%2Flogo.png&mark-align=top%2Cleft&mark-pad=50&mark-w=64&w=1200&auto=format&fit=crop&q=60" />
+            <img src="https://images.unsplash.com/photo-1616531770192-6eaea74c2456?auto=format&fit=crop&q=60&w=400" style="border-radius:10px; max-width:200px;" />
         </div>
-        <h1>Missed a meeting? No need to rewatch it.</h1>
-        <p>Upload your audio or video. We'll extract the insights and answer your questions instantly.</p>
+        <h1>{m_type} Intelligence</h1>
+        <p>AI is tuned for <b>{m_type}</b>. Upload your session to extract specialized insights.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -104,27 +92,35 @@ if choice == " Meeting Summary":
     title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Sync")
     
     if file:
-        if file.type.startswith('video'): st.video(file) 
+        if file.type.startswith('video'): st.video(file) #
         else: st.audio(file)
                 
-    if st.button(" Meeting Summary", type="primary", use_container_width=True):
+    if st.button("Generate Summary", type="primary", use_container_width=True):
         if not title:
             st.warning("Please enter a session title.")
         else:
-            with st.spinner("Decoding meeting context..."):
+            with st.spinner(f"Processing {m_type} context..."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                     tmp.write(file.getvalue())
                     tmp_path = tmp.name
 
+                # Transcription
                 w_model = whisper.load_model("base")
                 result = w_model.transcribe(tmp_path)
                 raw_text = result["text"]
                 os.remove(tmp_path)
 
                 st.session_state['current_transcript'] = raw_text
-                p = r"([^.]*(?:monday|friday|deadline|will|must|homework|assignment|submit|due|by|tasked|decided)[^.]*\.)"
+                
+                # FIX: Adaptive Extraction Pattern
+                if is_academic:
+                    p = r"([^.]*(?:homework|assignment|test|exam|chapter|read|submit|page)[^.]*\.)"
+                else:
+                    p = r"([^.]*(?:monday|friday|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
+                
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
+                # Summarization
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:2500], return_tensors="pt", max_length=1024, truncation=True)
@@ -141,37 +137,37 @@ if choice == " Meeting Summary":
                 st.session_state['summary'] = summary
                 st.session_state['actions'] = actions
                 st.session_state['ts'] = ts
+                st.session_state['active_m_type'] = m_type
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     if 'summary' in st.session_state:
         st.divider()
-        st.subheader("Executive Synthesis")
+        st.subheader(f"Results: {st.session_state.get('active_m_type', m_type)}")
         c1, c2 = st.columns(2)
-        with c1: st.info(f"**📄 Summary:**\n\n{st.session_state['summary']}")
-        with c2: st.success(f"**🎯 Action Items:**\n\n{st.session_state['actions']}")
+        # Using fixed dynamic labels
+        with c1: st.info(f"**{summary_label}:**\n\n{st.session_state['summary']}")
+        with c2: st.success(f"**{action_label}:**\n\n{st.session_state['actions']}")
 
-        # --- PINPOINT QUERY ENGINE (FIXED FOR RAHUL'S ROLE) ---
         st.divider()
         st.subheader("💬 Strategic Query Engine")
         user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...", key="query_input")
         if user_q:
             ctx = st.session_state['current_transcript']
-            # Search logic: prioritize sentences containing the specific name/noun
             sentences = [s.strip() for s in ctx.split('.') if len(s.strip()) > 5]
             query_words = [w.lower() for w in user_q.split() if len(w) > 2]
+            # Pinpoint search logic
             matches = [s for s in sentences if any(w in s.lower() for w in query_words)]
 
             st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
             if matches:
-                # Return the specific sentences found instead of a generic intro
-                st.write(f"**Advisor Response:** Based on the transcript: *{'. '.join(matches[:2])}*")
+                st.write(f"**Advisor Response:** {'. '.join(matches[:2])}.")
             else:
-                st.write("**Advisor Response:** I couldn't find a specific mention of that. Try using a different keyword.")
+                st.write("**Advisor Response:** I couldn't find a specific mention. Try different keywords.")
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
-elif choice == "📅 Meeting Archives":
+elif choice == " Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding: 1.5rem;"><h1>Archives</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
@@ -185,4 +181,3 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
-
