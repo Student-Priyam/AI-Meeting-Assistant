@@ -52,7 +52,7 @@ st.markdown("""
 
     /* Hero Banner - New Bright Blue Shade */
     .hero-banner {
-        background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+        background: #005A92;
         padding: 3rem 2rem;
         border-radius: 16px;
         margin-bottom: 2.5rem;
@@ -82,17 +82,17 @@ with st.sidebar:
     
     m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Strategy Sync"])
     st.markdown("---")
-    choice = st.radio("Navigation", ["🚀 Intelligence Suite", "📅 Meeting Archives"], label_visibility="collapsed")
+    choice = st.radio("Navigation", [" Meeting Summary", " Meeting Archives"], label_visibility="collapsed")
     
     st.markdown("---")
     st.markdown("<div style='text-align:center; opacity:0.8;'>v8.0 Enterprise Edition<br><small>Powered by Whisper & BART</small></div>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE ---
-if choice == "🚀 Intelligence Suite":
+if choice == " Meeting Summary":
     st.markdown("""
     <div class="hero-banner">
         <div style="margin-bottom: 1rem;">
-            <img src="https://img.icons8.com/fluency/96/meeting-time.png" />
+            <img src="https://images.unsplash.com/opengraph/1x1.png?blend=https:%2F%2Fimages.unsplash.com%2Fphoto-1616531770192-6eaea74c2456%3Fblend%3D000000%26blend-alpha%3D10%26blend-mode%3Dnormal%26crop%3Dfaces%252Cedges%26h%3D630%26mark%3Dhttps%253A%252F%252Fimages.unsplash.com%252Fopengraph%252Fsearch-input.png%253Fh%253D84%2526txt%253Donline%252Bmeeting%2526txt-align%253Dmiddle%25252Cleft%2526txt-clip%253Dellipsis%2526txt-color%253D000000%2526txt-pad%253D80%2526txt-size%253D40%2526txt-width%253D660%2526w%253D750%2526auto%253Dformat%2526fit%253Dcrop%2526q%253D60%26mark-align%3Dmiddle%252Ccenter%26mark-w%3D750%26w%3D1200%26auto%3Dformat%26fit%3Dcrop%26q%3D60%26ixid%3DM3wxMjA3fDB8MXxzZWFyY2h8Nnx8b25saW5lJTIwbWVldGluZ3xlbnwwfHx8fDE3MTk5MDk3NjZ8MA%26ixlib%3Drb-4.0.3&blend-w=1&h=630&mark=https:%2F%2Fimages.unsplash.com%2Fopengraph%2Flogo.png&mark-align=top%2Cleft&mark-pad=50&mark-w=64&w=1200&auto=format&fit=crop&q=60" />
         </div>
         <h1>Missed a meeting? No need to rewatch it.</h1>
         <p>Upload your audio or video. We'll extract the insights and answer your questions instantly.</p>
@@ -107,7 +107,7 @@ if choice == "🚀 Intelligence Suite":
         if file.type.startswith('video'): st.video(file) 
         else: st.audio(file)
                 
-    if st.button("🚀 Process Intelligence", type="primary", use_container_width=True):
+    if st.button(" Meeting Summary", type="primary", use_container_width=True):
         if not title:
             st.warning("Please enter a session title.")
         else:
@@ -185,3 +185,4 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
+
