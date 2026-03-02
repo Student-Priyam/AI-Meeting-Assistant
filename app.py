@@ -1,429 +1,222 @@
-<think>
-The user is getting a syntax error because there's corrupted text in the file. They want a generic, clean version of the code that works properly. Let me create a completely clean, properly formatted version that:
-
-1. Has no corrupted text
-2. Is generic (not specific to any particular use case)
-3. Works on Streamlit Cloud
-4. Uses AI models for efficient output
-
-Let me write the complete, clean code from scratch.
-
-</think># Strategic Intel: Clean Generic Version
-
-Here's the complete, clean code with no corrupted text:
-
-## 1. `requirements.txt`
-
-```
-streamlit>=1.28.0
-pandas>=2.1.0
-reportlab>=4.0.0
-openai>=1.0.0
-```
-
-## 2. `app.py`
-
-```python
 import streamlit as st
-import sqlite3
+import whisper
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import re
-import tempfile
 import os
-import pandas as pd
+import sqlite3
+import tempfile
+from datetime import datetime
+from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import LETTER
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from io import BytesIO
-import datetime
-from collections import Counter
-import json
-from openai import OpenAI
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-st.set_page_config(
-    page_title="Strategic Intel | AI Briefing System", 
-    layout="wide", 
-    page_icon="🧠"
-)
+# --- 1. DATABASE ARCHITECTURE ---
+def init_db():
+    conn = sqlite3.connect('strategic_intel_master.db')
+    c = conn.cursor()
+    # Schema supports meeting types for categorized archives
+    c.execute('''CREATE TABLE IF NOT EXISTS archives 
+                 (id INTEGER PRIMARY KEY, date TEXT, title TEXT, type TEXT, summary TEXT, actions TEXT, transcript TEXT)''')
+    conn.commit()
+    conn.close()
+
+def delete_meeting(m_id):
+    conn = sqlite3.connect('strategic_intel_master.db')
+    conn.execute("DELETE FROM archives WHERE id=?", (m_id,))
+    conn.commit()
+    conn.close()
+
+# --- 2. PROFESSIONAL PDF GENERATOR (MoM) ---
+def create_pdf(title, summary, actions, date, m_type):
+    pdf_path = f"Report_{date.replace(':', '-')}.pdf"
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Enterprise Color Palette
+    p_blue = colors.Color(30/255, 42/255, 56/255) # #1E2A38
+    a_blue = colors.Color(79/255, 124/255, 255/255) # #4F7CFF
+
+    title_s = ParagraphStyle('T', fontSize=22, textColor=p_blue, spaceAfter=20, fontName="Helvetica-Bold")
+    sub_s = ParagraphStyle('S', fontSize=14, textColor=a_blue, spaceBefore=15, spaceAfter=10, fontName="Helvetica-Bold")
+    body_s = ParagraphStyle('B', fontSize=10, leading=14, fontName="Helvetica")
+
+    story.append(Paragraph("STRATEGIC MEETING INTELLIGENCE", title_s))
+    story.append(Paragraph(f"<b>SESSION:</b> {title.upper()} | <b>TYPE:</b> {m_type}", body_s))
+    story.append(Paragraph(f"<b>DATE:</b> {date}", body_s))
+    story.append(Spacer(1, 25))
+
+    story.append(Paragraph("EXECUTIVE SUMMARY", sub_s))
+    story.append(Paragraph(summary, body_s))
+    story.append(Spacer(1, 20))
+
+    story.append(Paragraph("KEY ASSIGNMENTS & DELIVERABLES", sub_s))
+    table_data = [["ID", "TASK / ACCOUNTABILITY"]]
+    for i, item in enumerate(actions.split('\n'), 1):
+        if item.strip():
+            table_data.append([str(i), item.strip().replace('• ', '')])
+
+    if len(table_data) > 1:
+        t = Table(table_data, colWidths=[40, 440])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.Color(0.95, 0.97, 0.98)),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('PADDING', (0,0), (-1,-1), 8),
+        ]))
+        story.append(t)
+    
+    doc.build(story)
+    return pdf_path
+
+init_db()
+
+# --- 3. PREMIUM SaaS UI/UX ---
+st.set_page_config(page_title="Strategic Intel", layout="wide", page_icon="💼")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #F8FAFC; }
-    div[data-testid="stVerticalBlock"] > div > div {
-        background-color: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC !important; }
+    
+    /* Executive Cards */
+    .executive-card {
+        background: white; padding: 2rem; border-radius: 12px;
+        border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem; color: #1E293B;
     }
-    h1, h2, h3 { color: #1E2A38 !important; font-family: 'Helvetica Neue', sans-serif; }
-    .stButton>button {
-        background-color: #1E2A38; color: white; border-radius: 4px; border: none;
-        padding: 0.5rem 1rem; font-weight: 500;
-    }
-    .stButton>button:hover { background-color: #334155; color: white; }
-    [data-testid="stMetricValue"] { color: #1E2A38; }
-    [data-testid="stMetricLabel"] { color: #64748B; }
-    .stProgress > div > div > div > div { background-color: #10B981; }
-    .stSuccess { background-color: #D1FAE5; color: #065F46; border-radius: 8px; }
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #E2E8F0; border-radius: 4px 4px 0px 0px; color: #1E2A38;
-    }
-    [data-testid="stSidebar"] { background-color: #1E2A38; }
-    [data-testid="stSidebar"] * { color: #F8FAFC !important; }
+    .main-title { color: #1E2A38; font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    .sub-title { color: #64748B; font-size: 16px; margin-bottom: 30px; }
+    
+    /* Workspace Badges */
+    .badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .badge-corp { background: #E0E7FF; color: #4338CA; }
+    .badge-edu { background: #DCFCE7; color: #15803D; }
+
+    /* AI Bubble */
+    .ai-bubble { background-color: #F1F5F9; border-left: 5px solid #4F7CFF; padding: 1.2rem; border-radius: 10px; margin: 10px 0; }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-class StrategicDB:
-    def __init__(self, db_name="strategic_intel_final.db"):
-        self.conn = sqlite3.connect(db_name, check_same_thread=False)
-        self.create_tables()
-
-    def create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS meetings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                filename TEXT,
-                upload_date TIMESTAMP,
-                mode TEXT,
-                transcript TEXT,
-                summary TEXT,
-                assignments TEXT,
-                intel_data TEXT
-            )
-        ''')
-        self.conn.commit()
-
-    def save_meeting(self, filename, mode, transcript, summary, assignments, intel_data):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO meetings (filename, upload_date, mode, transcript, summary, assignments, intel_data)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (filename, datetime.datetime.now(), mode, transcript, summary, assignments, intel_data))
-        self.conn.commit()
-
-    def get_history(self):
-        return pd.read_sql("SELECT * FROM meetings ORDER BY id DESC", self.conn)
-
-    def delete_meeting(self, meeting_id):
-        cursor = self.conn.cursor()
-        cursor.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
-        self.conn.commit()
-
-db = StrategicDB()
-
-def get_openai_client():
-    if 'openai_api_key' in st.session_state and st.session_state['openai_api_key']:
-        return OpenAI(api_key=st.session_state['openai_api_key'])
-    return None
-
-def transcribe_audio(client, audio_file):
-    try:
-        transcript = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file
-        )
-        return transcript.text
-    except Exception as e:
-        st.error(f"Transcription error: {e}")
-        return None
-
-def generate_summary(client, transcript, mode):
-    if mode == "Corporate Strategy":
-        system_prompt = """You are an executive assistant. Create a concise strategic summary 
-        with: 1) Key decisions made, 2) Strategic priorities, 3) Financial/budget implications, 
-        4) Action items with owners. Format as bullet points."""
-    else:
-        system_prompt = """You are an academic tutor. Create a summary with: 
-        1) Core concepts covered, 2) Important dates/deadlines, 3) Assignments/homework, 
-        4) Topics to review. Format as bullet points."""
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Transcript:\n\n{transcript[:10000]}"}
-            ],
-            max_tokens=500,
-            temperature=0.3
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        st.error(f"Summarization error: {e}")
-        return None
-
-def extract_assignments_ai(client, transcript):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": """Extract all action items and assignments from the transcript.
-                For each item, identify: WHO is responsible, WHAT needs to be done, and any DEADLINE.
-                Return as a JSON array with objects containing: recipient, action, deadline.
-                If no deadline mentioned, set to 'ASAP'.
-                Example: [{"recipient": "Sarah", "action": "Finalize budget report", "deadline": "Friday"}]"""},
-                {"role": "user", "content": f"Transcript:\n\n{transcript[:8000]}"}
-            ],
-            max_tokens=1000,
-            temperature=0.2
-        )
-        
-        try:
-            assignments_data = json.loads(response.choices[0].message.content)
-            assignments = []
-            for item in assignments_data:
-                assignments.append(f"👤 {item['recipient']}: {item['action']} (Due: {item['deadline']})")
-            return assignments
-        except:
-            return [f"👤 {response.choices[0].message.content}"]
-            
-    except Exception as e:
-        st.error(f"Assignment extraction error: {e}")
-        return []
-
-def answer_question(client, question, all_transcripts):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": """You are a strategic advisor. Answer questions based 
-                ONLY on the provided meeting transcripts. Be specific and cite the context."""},
-                {"role": "user", "content": f"Question: {question}\n\nTranscripts:\n\n{all_transcripts[:15000]}"}
-            ],
-            max_tokens=500,
-            temperature=0.3
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-def simple_summarize(text, num_sentences=5):
-    if not text or len(text.strip()) < 50:
-        return text if text else "Text too short to summarize."
-    
-    sentences = re.split(r'[.!?]+', text)
-    sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
-    
-    if len(sentences) <= num_sentences:
-        return text
-    
-    words = text.lower().split()
-    stop_words = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-                  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-                  'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare',
-                  'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
-                  'into', 'through', 'during', 'before', 'after', 'above', 'below',
-                  'and', 'but', 'or', 'nor', 'so', 'yet', 'both', 'either', 'neither',
-                  'not', 'only', 'just', 'also', 'very', 'too', 'quite', 'rather'}
-    
-    word_freq = Counter([w for w in words if w not in stop_words and len(w) > 2])
-    
-    sentence_scores = {}
-    for i, sentence in enumerate(sentences):
-        sentence_words = sentence.lower().split()
-        if sentence_words:
-            score = sum(word_freq.get(w, 0) for w in sentence_words) / len(sentence_words)
-            if re.search(r'\d+', sentence):
-                score *= 1.5
-            if re.search(r'[A-Z][a-z]+', sentence):
-                score *= 1.2
-            sentence_scores[i] = score
-    
-    top_indices = sorted(sentence_scores.keys(), key=lambda x: sentence_scores[x], reverse=True)[:num_sentences]
-    top_indices.sort()
-    
-    return '. '.join([sentences[i] for i in top_indices]) + '.'
-
-def extract_assignments(text):
-    assignments = []
-    
-    patterns = [
-        r"([A-Z][a-z]+),?\s+(?:please|can you|need to|should|will you|must)\s+(.+?)(?:\.|$)",
-        r"(?:action item|action)[:\s]+([A-Z][a-z]+)[:\s]+(.+?)(?:\.|$)",
-        r"([A-Z][a-z]+)\s+(?:will|is going to|should|must)\s+(.+?)(?:\.|$)",
-        r"(?:assigned to|owner)[:\s]+([A-Z][a-z]+)[:\s]+(.+?)(?:\.|$)",
-    ]
-    
-    for pattern in patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            groups = match.groups()
-            if len(groups) >= 2:
-                recipient, action = groups[0], groups[1]
-                action = re.sub(r'\s+', ' ', action).strip()
-                if len(action) > 5:
-                    assignments.append(f"👤 {recipient.strip()}: {action.strip().capitalize()}")
-    
-    seen = set()
-    unique_assignments = []
-    for a in assignments:
-        if a.lower() not in seen:
-            seen.add(a.lower())
-            unique_assignments.append(a)
-    
-    return unique_assignments
-
-def generate_sample_intelligence(filename, mode):
-    return f"""
-    Welcome to today's {mode} session. This is a comprehensive overview of recent developments.
-    The team has made significant progress on multiple fronts. Rahul will present the key findings.
-    Sarah, please take notes for the follow-up documentation. John has prepared the quarterly report.
-    Lisa, can you distribute it to all stakeholders? The main topics include project timelines and resource allocation.
-    Mike will address any technical challenges. Action item: Rahul - present findings.
-    Action item: Sarah - distribute documentation. Action item: John - finalize quarterly report.
-    We have achieved our targets for this period. Next review scheduled for next week.
-    """
-
-def create_pdf(filename, summary, assignments, intel_data):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=LETTER)
-    elements = []
-    styles = getSampleStyleSheet()
-
-    elements.append(Paragraph(f"STRATEGIC BRIEFING: {filename}", styles['Title']))
-    elements.append(Spacer(1, 12))
-    elements.append(Paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
-    elements.append(Spacer(1, 24))
-
-    elements.append(Paragraph("Executive Summary", styles['Heading2']))
-    elements.append(Paragraph(summary, styles['Normal']))
-    elements.append(Spacer(1, 24))
-
-    elements.append(Paragraph("Strategic Deliverables & Assignments", styles['Heading2']))
-    data = [['Recipient', 'Action Required', 'Deadline']]
-    
-    if assignments:
-        for item in assignments:
-            parts = item.replace("👤 ", "").split(":")
-            if len(parts) > 1:
-                action_parts = parts[1].split("(Due:")
-                action = action_parts[0].strip()
-                deadline = action_parts[1].replace(")", "").strip() if len(action_parts) > 1 else "ASAP"
-                data.append([parts[0].strip(), action, deadline])
-            else:
-                data.append(["Unassigned", parts[0], "ASAP"])
-    else:
-        data.append(["N/A", "No explicit assignments detected.", "N/A"])
-
-    t = Table(data, colWidths=[120, 280, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.2, 0.2, 0.5)),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(t)
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-def process_video(uploaded_file, mode, use_ai=True):
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    try:
-        status_text.text("Step 1/4: Preparing file...")
-        progress_bar.progress(10)
-        
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
-        tfile.write(uploaded_file.read())
-        audio_path = tfile.name
-        tfile.close()
-        
-        status_text.text("Step 2/4: Transcribing audio...")
-        progress_bar.progress(30)
-        
-        client = get_openai_client()
-        
-        if use_ai and client:
-            with open(audio_path, 'rb') as audio_file:
-                transcript = transcribe_audio(client, audio_file)
-            
-            if not transcript:
-                transcript = generate_sample_intelligence(uploaded_file.name, mode)
-        else:
-            transcript = generate_sample_intelligence(uploaded_file.name, mode)
-            st.info("Using demo mode (add API key for real transcription)")
-        
-        status_text.text("Step 3/4: Analyzing intelligence...")
-        progress_bar.progress(60)
-        
-        if use_ai and client:
-            summary = generate_summary(client, transcript, mode)
-            if not summary:
-                summary = simple_summarize(transcript)
-            assignments = extract_assignments_ai(client, transcript)
-            if not assignments:
-                assignments = extract_assignments(transcript)
-        else:
-            summary = simple_summarize(transcript)
-            assignments = extract_assignments(transcript)
-        
-        status_text.text("Step 4/4: Compiling results...")
-        progress_bar.progress(90)
-        
-        intel_data = {
-            "file_size": f"{uploaded_file.size / 1024:.1f} KB",
-            "assignments_count": len(assignments),
-            "mode": mode,
-            "ai_powered": use_ai and client is not None
-        }
-        
-        progress_bar.progress(100)
-        status_text.text("Processing complete!")
-        
-        return transcript, summary, assignments, intel_data
-        
-    except Exception as e:
-        status_text.text(f"Error: {str(e)}")
-        raise e
-    finally:
-        try:
-            os.unlink(audio_path)
-        except:
-            pass
-
-st.title("Strategic Intel")
-st.caption("AI-Powered Meeting Intelligence System")
-
+# --- 4. NAVIGATION & SETTINGS ---
 with st.sidebar:
-    st.header("Settings")
-    mode = st.radio("Mode:", ["Corporate Strategy", "Academic Review"])
-    
+    st.markdown("<h2 style='color:#1E2A38;'>💼 Workspace</h2>", unsafe_allow_html=True)
+    m_type = st.selectbox("Meeting Classification", 
+                          ["Corporate Board Sync", "Academic Lecture/Class", "Strategic Webinar", "Technical Sprint"])
     st.markdown("---")
-    st.header("AI Configuration")
-    api_key = st.text_input("OpenAI API Key:", type="password")
-    if api_key:
-        st.session_state['openai_api_key'] = api_key
-        st.success("API Key configured!")
-    
-    st.markdown("---")
-    st.header("Processing Options")
-    use_ai = st.checkbox("Use AI Processing", value=True, disabled=not api_key)
-    st.info("Without API key, demo mode will be used.")
+    choice = st.radio("Menu", ["🚀 Intelligence Suite", "📅 Records Archive", "💬 Strategic Advisor"], label_visibility="collapsed")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Ingest", "Dashboard", "Advisor", "Archives"])
-
-with tab1:
-    uploaded_file = st.file_uploader("Upload Meeting/Class Recording", type=["mp4", "mov", "mp3", "wav"])
+# --- TAB 1: INTELLIGENCE SUITE (Processing) ---
+if choice == "🚀 Intelligence Suite":
+    st.markdown(f'<h1 class="main-title">{m_type} Analysis</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Upload recordings to extract high-value intelligence.</p>', unsafe_allow_html=True)
     
-    if uploaded_file is not None:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.video(uploaded_file)
-        with col2:
-            st.write("File:", uploaded_file.name)
-            st.write("Size:", f"{uploaded_file.size / 1024:.1f} KB")
-        
-        if st.button("Extract Intelligence", type="primary"):
-            transcript, summary, assignments, intel = process_video(uploaded_file, mode, use_ai)
+    st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+    file = st.file_uploader("Upload Video or Audio", type=["mp3", "wav", "mp4", "m4a", "mov"], label_visibility="collapsed")
+    
+    if file:
+        if file.type.startswith('video'):
+            st.video(file) # Video Preview Feature
+        else:
+            st.audio(file)
             
-            db.save_meeting(
-                uploaded_file.name, mode
+    title = st.text_input("Session Reference", placeholder="e.g. Q1 Marketing Sync or Physics Lecture 10")
+    
+    if file and st.button("🚀 Process Intelligence"):
+        with st.spinner("AI is synthesizing meeting context..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
+                tmp.write(file.getvalue())
+                tmp_path = tmp.name
+
+            # AI Logic: Whisper extracts audio from video natively
+            w_model = whisper.load_model("base")
+            result = w_model.transcribe(tmp_path)
+            raw_text = result["text"]
+            os.remove(tmp_path)
+
+            # Assignment Logic: Detect "Who to Whom"
+            patterns = r"([^.]*(?:will|must|deadline|homework|assignment|submit|due|tasked)[^.]*\.)"
+            actions = "\n".join([f"• {a.strip()}" for a in re.findall(patterns, raw_text, re.I)])
+
+            # Summarization Engine
+            tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+            s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
+            inputs = tokenizer("summarize: " + raw_text[:2500], return_tensors="pt", max_length=1024, truncation=True)
+            sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
+            summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
+
+            # Persistent Sync
+            ts = datetime.now().strftime("%d-%m-%Y %H:%M")
+            conn = sqlite3.connect('strategic_intel_master.db')
+            conn.execute("INSERT INTO archives (date, title, type, summary, actions, transcript) VALUES (?,?,?,?,?,?)",
+                         (ts, title, m_type, summary, actions, raw_text))
+            conn.commit()
+            conn.close()
+
+            st.success("Intelligence Synchronized!")
+            pdf_out = create_pdf(title, summary, actions, ts, m_type)
+            with open(pdf_out, "rb") as f:
+                st.download_button("📥 Download Official MoM", f, file_name=f"{title}.pdf")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- TAB 2: RECORDS ARCHIVE (Fixed View) ---
+elif choice == "📅 Records Archive":
+    st.markdown('<h1 class="main-title">Intelligence Archives</h1>', unsafe_allow_html=True)
+    conn = sqlite3.connect('strategic_intel_master.db')
+    data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
+    
+    if not data:
+        st.info("Archives are currently empty. Process a session to view records.")
+    else:
+        for row in data:
+            st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([4, 1.5, 0.5])
+            with c1:
+                b_class = "badge-edu" if "Academic" in row[3] else "badge-corp"
+                st.markdown(f"### {row[2]} <span class='badge {b_class}'>{row[3]}</span>", unsafe_allow_html=True)
+                st.caption(f"📅 Recorded: {row[1]}")
+            with c2:
+                if st.button("Review Details", key=f"v_{row[0]}"):
+                    st.session_state[f"sh_{row[0]}"] = not st.session_state.get(f"sh_{row[0]}", False)
+            with c3:
+                if st.button("🗑️", key=f"d_{row[0]}"):
+                    delete_meeting(row[0])
+                    st.rerun()
+            
+            if st.session_state.get(f"sh_{row[0]}", False):
+                st.markdown("---")
+                st.markdown(f"**Summary:** {row[4]}")
+                st.markdown(f"**Action Items:** {row[5]}")
+            st.markdown('</div>', unsafe_allow_html=True)
+    conn.close()
+
+# --- TAB 3: STRATEGIC ADVISOR (Fixed Mapping & Q&A) ---
+elif choice == "💬 Strategic Advisor":
+    st.markdown('<h1 class="main-title">Strategic Advisor</h1>', unsafe_allow_html=True)
+    conn = sqlite3.connect('strategic_intel_master.db')
+    rows = conn.execute("SELECT title, transcript FROM archives").fetchall()
+    # Correct mapping for dropdown
+    recs = {r[0]: r[1] for r in rows} 
+    
+    if recs:
+        st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+        # Dropdown fix: List of keys (titles) populate correctly
+        sel_m = st.selectbox("Choose Session Context", list(recs.keys()))
+        query = st.text_input("Consult with AI about this session...", placeholder="e.g. What was Rahul's role?")
+        
+        if query:
+            context = recs[sel_m]
+            # Pinpoint sentence retrieval
+            matches = [s.strip() for s in context.split('.') if any(w.lower() in s.lower() for w in query.split())]
+            
+            st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
+            if matches:
+                st.write(f"**Advisor Response:** Based on '{sel_m}', I found: {'. '.join(matches[:2])}.")
+            else:
+                st.write("**Advisor Response:** No direct mention found. Try broader keywords like 'task' or 'deadline'.")
+            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("Process a meeting to enable the Strategic Advisor.")
+    conn.close()
