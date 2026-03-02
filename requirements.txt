@@ -2,8 +2,4 @@ streamlit
 openai-whisper
 transformers
 torch
-
-
-
-
-
+reportlab
