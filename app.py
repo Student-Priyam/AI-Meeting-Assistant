@@ -34,11 +34,14 @@ def create_pro_pdf(title, summary, actions, date):
     styles = getSampleStyleSheet()
     story = []
 
-    # Using standard colors to prevent hexColor crashes
+    # Branding & Styles
     title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=22, textColor=colors.darkblue, spaceAfter=12)
     heading_style = ParagraphStyle('HeadingStyle', parent=styles['Heading2'], fontSize=14, textColor=colors.blue, spaceBefore=15, spaceAfter=10)
+    confidential_style = ParagraphStyle('Confidential', parent=styles['Normal'], fontSize=9, textColor=colors.red, alignment=1)
     body_style = styles['Normal']
 
+    story.append(Paragraph("CONFIDENTIAL | STRATEGIC INTEL", confidential_style))
+    story.append(Spacer(1, 10))
     story.append(Paragraph("STRATEGIC MEETING MINUTES", title_style))
     story.append(Paragraph(f"<b>Subject:</b> {title}", body_style))
     story.append(Paragraph(f"<b>Date:</b> {date}", body_style))
@@ -50,7 +53,6 @@ def create_pro_pdf(title, summary, actions, date):
 
     story.append(Paragraph("ACTION ITEMS & DELIVERABLES", heading_style))
     
-    # Table Logic
     action_data = [["ID", "Deliverable / Deadline"]]
     for i, item in enumerate(actions.split('\n'), 1):
         if item.strip():
@@ -73,53 +75,50 @@ def create_pro_pdf(title, summary, actions, date):
 
 init_db()
 
-# --- 3. UNIQUE PREMIUM UI/UX (Glass-Morphism Dark Theme) ---
+# --- 3. PREMIUM UI/UX (Glass-Morphism Dark Theme) ---
 st.set_page_config(page_title="Strategic Meeting Intelligence", layout="wide")
 
 st.markdown("""
     <style>
     .stApp {
-        background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+        background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), 
                     url("https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069");
         background-size: cover;
         background-attachment: fixed;
     }
     .glass-card {
-        background: rgba(255, 255, 255, 0.95);
-        padding: 2rem;
+        background: rgba(255, 255, 255, 0.96);
+        padding: 2.2rem;
         border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-        color: #1e293b;
-        margin-bottom: 20px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+        color: #0f172a;
+        margin-bottom: 25px;
     }
-    .main-title { color: white; font-size: 3rem; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .main-title { color: white; font-size: 3.2rem; font-weight: 800; text-align: center; margin-bottom: 1rem; }
     .stButton>button {
-        background-image: linear-gradient(to right, #2563eb, #1e40af);
-        color: white; border: none; border-radius: 10px; padding: 0.5rem 2rem;
-        transition: 0.3s;
+        background-image: linear-gradient(to right, #1e40af, #1e3a8a);
+        color: white; border-radius: 12px; font-weight: 600;
     }
-    .stButton>button:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(37,99,235,0.4); }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 4. NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align: center;'>💼 Workspace</h2>", unsafe_allow_html=True)
-    choice = st.radio("Go to:", ["🚀 New Intelligence", "📅 Meeting Archives", "💬 AI Consultant"])
+    st.markdown("<h2 style='text-align: center;'>💼 Enterprise Hub</h2>", unsafe_allow_html=True)
+    choice = st.sidebar.radio("Navigation", ["🚀 Intelligence Suite", "📅 Meeting Archives", "💬 Strategic Advisor"])
     st.markdown("---")
-    st.caption("Powered by Enterprise AI v3.0")
+    st.caption("Strategic Meeting Intelligence v4.0")
 
-# --- TAB 1: NEW INTELLIGENCE ---
-if choice == "🚀 New Intelligence":
-    st.markdown("<h1 class='main-title'>Strategic Synthesis</h1>", unsafe_allow_html=True)
-    
+# --- TAB 1: INTELLIGENCE SUITE ---
+if choice == "🚀 Intelligence Suite":
+    st.markdown("<h1 class='main-title'>Meeting Synthesis</h1>", unsafe_allow_html=True)
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    audio_file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"])
-    m_title = st.text_input("Meeting Subject", placeholder="e.g. Annual Strategy Review")
     
-    if audio_file and st.button("Generate Strategic MoM"):
-        with st.spinner("Analyzing meeting context..."):
+    audio_file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"])
+    m_title = st.text_input("Project / Meeting Title", placeholder="e.g. Q1 Operational Review")
+    
+    if audio_file and st.button("🚀 Process Intelligence"):
+        with st.spinner("Synthesizing context and intent..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[1]) as tmp:
                 tmp.write(audio_file.getvalue())
                 tmp_path = tmp.name
@@ -130,8 +129,8 @@ if choice == "🚀 New Intelligence":
             raw_text = result["text"]
             os.remove(tmp_path)
 
-            # Smart Intent Extraction
-            patterns = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete|final)[^.]*\.)"
+            # Advanced Pattern Matching
+            patterns = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete|final|date)[^.]*\.)"
             actions = "\n".join([a.strip() for a in re.findall(patterns, raw_text, re.I)])
 
             # Summarization
@@ -141,7 +140,7 @@ if choice == "🚀 New Intelligence":
             sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
             summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
-            # DB Save
+            # Database Entry
             ts = datetime.now().strftime("%d-%m-%Y %H:%M")
             conn = sqlite3.connect('meetings_pro.db')
             conn.execute("INSERT INTO meeting_history (date, title, summary, actions, transcript) VALUES (?,?,?,?,?)",
@@ -149,29 +148,29 @@ if choice == "🚀 New Intelligence":
             conn.commit()
             conn.close()
 
-            st.success("Synthesis complete. Archive updated.")
+            st.success("Analysis complete. Archive updated.")
             pdf_path = create_pro_pdf(m_title, summary, actions, ts)
             with open(pdf_path, "rb") as f:
-                st.download_button("📥 Download Official PDF Minutes", f, file_name=f"{m_title}.pdf")
+                st.download_button("📥 Download Branded MoM (PDF)", f, file_name=f"{m_title}.pdf")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
-    st.markdown("<h1 class='main-title'>Intelligence Repository</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>Intelligence Records</h1>", unsafe_allow_html=True)
     conn = sqlite3.connect('meetings_pro.db')
     data = conn.execute("SELECT * FROM meeting_history ORDER BY id DESC").fetchall()
     
     if not data:
-        st.info("Repository is empty. Analyze a recording to begin.")
+        st.info("Archives are currently empty.")
     else:
         for row in data:
             st.markdown('<div class="glass-card">', unsafe_allow_html=True)
             col1, col2, col3 = st.columns([4, 1.5, 0.5])
             with col1:
                 st.subheader(f"📌 {row[2]}")
-                st.caption(f"📅 Logged on: {row[1]}")
+                st.caption(f"Logged on: {row[1]}")
             with col2:
-                if st.button("View / Edit", key=f"v_{row[0]}"):
+                if st.button("Edit Record", key=f"e_{row[0]}"):
                     st.session_state[f"ed_{row[0]}"] = not st.session_state.get(f"ed_{row[0]}", False)
             with col3:
                 if st.button("🗑️", key=f"d_{row[0]}"):
@@ -179,34 +178,37 @@ elif choice == "📅 Meeting Archives":
                     st.rerun()
 
             if st.session_state.get(f"ed_{row[0]}", False):
-                new_s = st.text_area("Executive Summary", row[3], height=150, key=f"ts_{row[0]}")
-                new_a = st.text_area("Action Items", row[4], height=150, key=f"ta_{row[0]}")
-                if st.button("Update Database", key=f"s_{row[0]}"):
+                new_s = st.text_area("Summary", row[3], height=120, key=f"s_{row[0]}")
+                new_a = st.text_area("Deliverables", row[4], height=120, key=f"a_{row[0]}")
+                if st.button("Update Sync", key=f"up_{row[0]}"):
                     c = conn.cursor()
                     c.execute("UPDATE meeting_history SET summary=?, actions=? WHERE id=?", (new_s, new_a, row[0]))
                     conn.commit()
-                    st.toast("Record Synchronized!")
+                    st.toast("Sync Successful!")
             st.markdown('</div>', unsafe_allow_html=True)
     conn.close()
 
-# --- TAB 3: AI CONSULTANT ---
-elif choice == "💬 AI Consultant":
-    st.markdown("<h1 class='main-title'>Strategic Advisor</h1>", unsafe_allow_html=True)
+# --- TAB 3: STRATEGIC ADVISOR (FIXED IndexError) ---
+elif choice == "💬 Strategic Advisor":
+    st.markdown("<h1 class='main-title'>Strategic Query Bot</h1>", unsafe_allow_html=True)
     conn = sqlite3.connect('meetings_pro.db')
-    recs = {r[2]: r[5] for r in conn.execute("SELECT title, transcript FROM meeting_history").fetchall()}
+    # FIX: Corrected indexes for SELECT query
+    rows = conn.execute("SELECT title, transcript FROM meeting_history").fetchall()
+    recs = {r[0]: r[1] for r in rows} # r[0] is title, r[1] is transcript
     
     if recs:
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        sel = st.selectbox("Select Contextual Meeting", list(recs.keys()))
-        query = st.text_input("Consult with AI about this meeting...")
+        sel = st.selectbox("Select Context for Query", list(recs.keys()))
+        query = st.text_input("Ask about specific decisions or mentions...")
         if query:
             ctx = recs[sel]
+            # Advanced keyword context matching
             matches = [s for s in ctx.split('.') if any(w.lower() in s.lower() for w in query.split())]
             if matches:
-                st.info(f"**AI Advisor:** {'. '.join(matches[:2])}.")
+                st.info(f"**Advisor Response:** {'. '.join(matches[:2])}.")
             else:
-                st.warning("No direct reference found. Try using broader keywords.")
+                st.warning("No direct mention found. Please use specific keywords like 'budget' or 'deadline'.")
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Archives are currently empty.")
+        st.info("Please process a meeting first to enable the Strategic Advisor.")
     conn.close()
