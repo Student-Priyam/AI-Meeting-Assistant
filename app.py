@@ -27,15 +27,16 @@ def delete_meeting(meeting_id):
     conn.commit()
     conn.close()
 
-# --- 2. PROFESSIONAL PDF GENERATOR ---
+# --- 2. STABLE PROFESSIONAL PDF GENERATOR ---
 def create_pro_pdf(title, summary, actions, date):
     pdf_path = f"MoM_{date.replace(':', '-')}.pdf"
     doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
 
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=20, textColor=colors.hexColor("#0f172a"), spaceAfter=10)
-    heading_style = ParagraphStyle('HeadingStyle', parent=styles['Heading2'], fontSize=14, textColor=colors.hexColor("#2563eb"), spaceBefore=15, spaceAfter=8)
+    # Using standard colors to prevent hexColor crashes
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=22, textColor=colors.darkblue, spaceAfter=12)
+    heading_style = ParagraphStyle('HeadingStyle', parent=styles['Heading2'], fontSize=14, textColor=colors.blue, spaceBefore=15, spaceAfter=10)
     body_style = styles['Normal']
 
     story.append(Paragraph("STRATEGIC MEETING MINUTES", title_style))
@@ -48,7 +49,9 @@ def create_pro_pdf(title, summary, actions, date):
     story.append(Spacer(1, 20))
 
     story.append(Paragraph("ACTION ITEMS & DELIVERABLES", heading_style))
-    action_data = [["ID", "Description"]]
+    
+    # Table Logic
+    action_data = [["ID", "Deliverable / Deadline"]]
     for i, item in enumerate(actions.split('\n'), 1):
         if item.strip():
             action_data.append([str(i), item.strip()])
@@ -56,135 +59,154 @@ def create_pro_pdf(title, summary, actions, date):
     if len(action_data) > 1:
         t = Table(action_data, colWidths=[40, 440])
         t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.hexColor("#f8fafc")),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.hexColor("#1e293b")),
+            ('BACKGROUND', (0,0), (-1,0), colors.whitesmoke),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.darkblue),
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 10),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.grey)
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
         story.append(t)
-    else:
-        story.append(Paragraph("No specific action items identified.", body_style))
     
     doc.build(story)
     return pdf_path
 
 init_db()
 
-# --- 3. UI/UX CONFIG (Clean & Modern) ---
-st.set_page_config(page_title="Pro Meeting Intel", layout="wide")
+# --- 3. UNIQUE PREMIUM UI/UX (Glass-Morphism Dark Theme) ---
+st.set_page_config(page_title="Strategic Meeting Intelligence", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #f1f5f9; }
-    .main-title { color: #0f172a; font-size: 2.2rem; font-weight: 800; }
-    .card {
-        background: white; padding: 1.5rem; border-radius: 10px;
-        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 1rem;
+    .stApp {
+        background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), 
+                    url("https://images.unsplash.com/photo-1497366216548-37526070297c?q=80&w=2069");
+        background-size: cover;
+        background-attachment: fixed;
     }
-    .delete-btn { color: #ef4444 !important; border-color: #ef4444 !important; }
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2rem;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+        color: #1e293b;
+        margin-bottom: 20px;
+    }
+    .main-title { color: white; font-size: 3rem; font-weight: 800; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+    .stButton>button {
+        background-image: linear-gradient(to right, #2563eb, #1e40af);
+        color: white; border: none; border-radius: 10px; padding: 0.5rem 2rem;
+        transition: 0.3s;
+    }
+    .stButton>button:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(37,99,235,0.4); }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 4. NAVIGATION ---
 with st.sidebar:
-    st.title("💼 Workspace")
-    choice = st.radio("Menu", ["🚀 New Analysis", "📅 Meeting Archives", "💬 AI Consultant"])
+    st.markdown("<h2 style='text-align: center;'>💼 Workspace</h2>", unsafe_allow_html=True)
+    choice = st.radio("Go to:", ["🚀 New Intelligence", "📅 Meeting Archives", "💬 AI Consultant"])
+    st.markdown("---")
+    st.caption("Powered by Enterprise AI v3.0")
 
-# --- TAB 1: NEW ANALYSIS ---
-if choice == "🚀 New Analysis":
+# --- TAB 1: NEW INTELLIGENCE ---
+if choice == "🚀 New Intelligence":
     st.markdown("<h1 class='main-title'>Strategic Synthesis</h1>", unsafe_allow_html=True)
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        audio_file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"])
-        m_title = st.text_input("Meeting Subject", placeholder="e.g. Council Budget Review")
-        
-        if audio_file and st.button("Generate Intelligence"):
-            with st.spinner("AI is decoding meeting context..."):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[1]) as tmp:
-                    tmp.write(audio_file.getvalue())
-                    tmp_path = tmp.name
+    
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    audio_file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"])
+    m_title = st.text_input("Meeting Subject", placeholder="e.g. Annual Strategy Review")
+    
+    if audio_file and st.button("Generate Strategic MoM"):
+        with st.spinner("Analyzing meeting context..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[1]) as tmp:
+                tmp.write(audio_file.getvalue())
+                tmp_path = tmp.name
 
-                w_model = whisper.load_model("base")
-                result = w_model.transcribe(tmp_path)
-                raw_text = result["text"]
-                os.remove(tmp_path)
+            # Transcription
+            w_model = whisper.load_model("base")
+            result = w_model.transcribe(tmp_path)
+            raw_text = result["text"]
+            os.remove(tmp_path)
 
-                # Intent Analysis (Dates & Keywords)
-                p = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete)[^.]*\.)"
-                actions = "\n".join([a.strip() for a in re.findall(p, raw_text, re.I)])
+            # Smart Intent Extraction
+            patterns = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete|final)[^.]*\.)"
+            actions = "\n".join([a.strip() for a in re.findall(patterns, raw_text, re.I)])
 
-                # Summarization
-                tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-                s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
-                inputs = tokenizer("summarize: " + raw_text[:2500], return_tensors="pt", max_length=1024, truncation=True)
-                sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
-                summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
+            # Summarization
+            tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+            s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
+            inputs = tokenizer("summarize: " + raw_text[:2500], return_tensors="pt", max_length=1024, truncation=True)
+            sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
+            summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
-                # Save Data
-                ts = datetime.now().strftime("%d-%m-%Y %H:%M")
-                conn = sqlite3.connect('meetings_pro.db')
-                conn.execute("INSERT INTO meeting_history (date, title, summary, actions, transcript) VALUES (?,?,?,?,?)",
-                             (ts, m_title, summary, actions, raw_text))
-                conn.commit()
-                conn.close()
+            # DB Save
+            ts = datetime.now().strftime("%d-%m-%Y %H:%M")
+            conn = sqlite3.connect('meetings_pro.db')
+            conn.execute("INSERT INTO meeting_history (date, title, summary, actions, transcript) VALUES (?,?,?,?,?)",
+                         (ts, m_title, summary, actions, raw_text))
+            conn.commit()
+            conn.close()
 
-                st.success("Successfully processed!")
-                pdf = create_pro_pdf(m_title, summary, actions, ts)
-                with open(pdf, "rb") as f:
-                    st.download_button("📥 Download Official Minutes", f, file_name=f"{m_title}.pdf")
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.success("Synthesis complete. Archive updated.")
+            pdf_path = create_pro_pdf(m_title, summary, actions, ts)
+            with open(pdf_path, "rb") as f:
+                st.download_button("📥 Download Official PDF Minutes", f, file_name=f"{m_title}.pdf")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 2: ARCHIVES (View & Delete) ---
+# --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
-    st.markdown("<h1 class='main-title'>Meeting Repository</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>Intelligence Repository</h1>", unsafe_allow_html=True)
     conn = sqlite3.connect('meetings_pro.db')
     data = conn.execute("SELECT * FROM meeting_history ORDER BY id DESC").fetchall()
     
     if not data:
-        st.info("No meetings found. Start by analyzing a new recording.")
+        st.info("Repository is empty. Analyze a recording to begin.")
     else:
         for row in data:
-            with st.container():
-                st.markdown(f'<div class="card">', unsafe_allow_html=True)
-                col1, col2, col3 = st.columns([4, 2, 1])
-                with col1:
-                    st.markdown(f"**{row[2]}**")
-                    st.caption(f"📅 {row[1]}")
-                with col2:
-                    if st.button("View/Edit", key=f"view_{row[0]}"):
-                        st.session_state[f"edit_{row[0]}"] = not st.session_state.get(f"edit_{row[0]}", False)
-                with col3:
-                    if st.button("🗑️", key=f"del_{row[0]}"):
-                        delete_meeting(row[0])
-                        st.rerun()
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([4, 1.5, 0.5])
+            with col1:
+                st.subheader(f"📌 {row[2]}")
+                st.caption(f"📅 Logged on: {row[1]}")
+            with col2:
+                if st.button("View / Edit", key=f"v_{row[0]}"):
+                    st.session_state[f"ed_{row[0]}"] = not st.session_state.get(f"ed_{row[0]}", False)
+            with col3:
+                if st.button("🗑️", key=f"d_{row[0]}"):
+                    delete_meeting(row[0])
+                    st.rerun()
 
-                # Expandable Edit Section
-                if st.session_state.get(f"edit_{row[0]}", False):
-                    new_sum = st.text_area("Summary", row[3], height=100, key=f"ts_{row[0]}")
-                    new_act = st.text_area("Actions", row[4], height=100, key=f"ta_{row[0]}")
-                    if st.button("Save Changes", key=f"save_{row[0]}"):
-                        c = conn.cursor()
-                        c.execute("UPDATE meeting_history SET summary=?, actions=? WHERE id=?", (new_sum, new_act, row[0]))
-                        conn.commit()
-                        st.toast("Record Updated!")
-                st.markdown('</div>', unsafe_allow_html=True)
+            if st.session_state.get(f"ed_{row[0]}", False):
+                new_s = st.text_area("Executive Summary", row[3], height=150, key=f"ts_{row[0]}")
+                new_a = st.text_area("Action Items", row[4], height=150, key=f"ta_{row[0]}")
+                if st.button("Update Database", key=f"s_{row[0]}"):
+                    c = conn.cursor()
+                    c.execute("UPDATE meeting_history SET summary=?, actions=? WHERE id=?", (new_s, new_a, row[0]))
+                    conn.commit()
+                    st.toast("Record Synchronized!")
+            st.markdown('</div>', unsafe_allow_html=True)
     conn.close()
 
 # --- TAB 3: AI CONSULTANT ---
 elif choice == "💬 AI Consultant":
-    st.markdown("<h1 class='main-title'>Strategic Query Bot</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>Strategic Advisor</h1>", unsafe_allow_html=True)
     conn = sqlite3.connect('meetings_pro.db')
     recs = {r[2]: r[5] for r in conn.execute("SELECT title, transcript FROM meeting_history").fetchall()}
     
     if recs:
-        sel = st.selectbox("Select Meeting Context", list(recs.keys()))
-        q = st.text_input("Ask about this meeting (e.g. Budget decisions?)")
-        if q:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        sel = st.selectbox("Select Contextual Meeting", list(recs.keys()))
+        query = st.text_input("Consult with AI about this meeting...")
+        if query:
             ctx = recs[sel]
-            ans = [s for s in ctx.split('.') if any(w.lower() in s.lower() for w in q.split())]
-            st.info(f"**AI:** {'. '.join(ans[:2]) if ans else 'No specific info found.'}")
+            matches = [s for s in ctx.split('.') if any(w.lower() in s.lower() for w in query.split())]
+            if matches:
+                st.info(f"**AI Advisor:** {'. '.join(matches[:2])}.")
+            else:
+                st.warning("No direct reference found. Try using broader keywords.")
+        st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Archives are empty.")
+        st.info("Archives are currently empty.")
     conn.close()
