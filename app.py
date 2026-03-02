@@ -29,10 +29,10 @@ def delete_record(record_id):
 init_db()
 
 # --- 2. PREMIUM UI/UX CONFIG ---
-st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
+st.set_page_config(page_title="Strategic Meeting | AI Meeting Assistant", layout="wide", page_icon="💼")
 
 # --- 2. PREMIUM UI/UX CONFIG (FIXED DROPDOWN VISIBILITY) ---
-st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
+st.set_page_config(page_title="Strategic Meeting | AI Meeting Assistant", layout="wide", page_icon="💼")
 
 st.markdown("""
 <style>
@@ -83,7 +83,7 @@ st.markdown("""
 
 # --- 3. NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC MEETING</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     
     # FIXED: Selection captured and passed to banner logic
@@ -92,7 +92,7 @@ with st.sidebar:
     choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
     
     st.markdown("---")
-    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'>v8.0 Professional Edition<br>Powered by Whisper & BART</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'> Whisper & BART</div>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE ---
 if choice == "🚀 Meeting Summary":
@@ -118,7 +118,7 @@ if choice == "🚀 Meeting Summary":
         if file.type.startswith('video'): st.video(file) # Full video processing support
         else: st.audio(file)
                 
-    if st.button("Generate Intelligence Summary", type="primary", use_container_width=True):
+    if st.button("Generate Summary", type="primary", use_container_width=True):
         if not title:
             st.warning("Please specify a session title.")
         else:
@@ -203,5 +203,6 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun() # Immediate list refresh
     conn.close()
+
 
 
