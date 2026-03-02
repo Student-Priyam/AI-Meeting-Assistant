@@ -58,10 +58,10 @@ st.markdown("""
     }
     ul[data-baseweb="menu"] li { color: #0F172A !important; }
 
-    /* Hero Banner - Responsive Bright Blue Gradient */
+    /* Hero Banner */
     .hero-banner {
         background: linear-gradient(135deg, #005A92 0%, #00426d 100%);
-        padding: 3.5rem 2rem;
+        padding: 3rem 2rem;
         border-radius: 16px;
         margin-bottom: 2.5rem;
         color: white;
@@ -69,36 +69,21 @@ st.markdown("""
         text-align: center;
     }
     .hero-banner h1 { font-size: 2.8rem; font-weight: 700; margin-bottom: 0.5rem; color: white !important; }
-    .hero-banner h2 { font-size: 1.8rem; font-weight: 600; color: #E0E7FF !important; margin-bottom: 1rem; }
-    .hero-banner p { font-size: 1.1rem; color: #cbd5e1 !important; }
+    .hero-banner h2 { font-size: 1.5rem; font-weight: 400; color: #E0E7FF !important; }
 
     .executive-card {
         background: white; padding: 2.5rem; border-radius: 12px; border: 1px solid #E2E8F0; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
     }
-    .ai-bubble {
-        background-color: #F1F5F9; border-left: 5px solid #3b82f6; padding: 1.5rem; 
-        border-radius: 0 12px 12px 0; margin: 1rem 0; color: #334155;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. NAVIGATION ---
-with st.sidebar:
-    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
-    st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
-    m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Technical Sync"])
-    st.markdown("---")
-    choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
-    st.markdown("---")
-    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'>v8.0 Professional Edition</div>", unsafe_allow_html=True)
-
-# --- 5. LONG-FORM AUDIO PROCESSING ---
+# --- 4. LONG-FORM AUDIO PROCESSING (CHUNKING) ---
 def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
     
-    # 5-minute chunks (300,000 ms) to save RAM
+    # 5-minute chunks (300,000 ms) to prevent RAM overload
     chunk_length = 5 * 60 * 1000 
     chunks = [audio[i:i + chunk_length] for i in range(0, len(audio), chunk_length)]
     
@@ -117,17 +102,23 @@ def transcribe_long_audio(file_path):
     
     return full_transcript
 
+# --- 5. NAVIGATION ---
+with st.sidebar:
+    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
+    st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
+    m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Technical Sync"])
+    st.markdown("---")
+    choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
+    st.markdown("---")
+    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'>v8.0 Professional Edition</div>", unsafe_allow_html=True)
+
 # --- TAB 1: INTELLIGENCE SUITE ---
 if choice == "🚀 Meeting Summary":
     st.markdown(f"""
     <div class="hero-banner">
-        <div style="margin-bottom: 1.5rem;">
-            <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=2070&auto=format&fit=crop" 
-                 style="border-radius:12px; max-width:400px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
-        </div>
         <h1>Missed a meeting? No need to rewatch it.</h1>
-        <h2>{m_type} Intelligence</h2>
-        <p>Optimized for sessions up to 60 minutes.</p>
+        <h2>{m_type} Intelligence Mode</h2>
+        <p>Optimized for long-form sessions up to 60 minutes.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -144,7 +135,6 @@ if choice == "🚀 Meeting Summary":
                     tmp.write(file.getvalue())
                     tmp_path = tmp.name
 
-                # Process using Chunking Logic
                 raw_text = transcribe_long_audio(tmp_path)
                 os.remove(tmp_path)
 
@@ -177,26 +167,28 @@ if choice == "🚀 Meeting Summary":
 
     if 'summary' in st.session_state:
         st.divider()
-        c1, c2 = st.columns(2)
-        with c1: st.info(f"**📄 Summary:**\n\n{st.session_state['summary']}")
-        with c2: st.success(f"**🎯 Actionable Items:**\n\n{st.session_state['actions']}")
+        st.markdown(f"### 🎯 Strategic Insights: {st.session_state.get('active_mode', m_type)}")
+        
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.markdown(f"""
+            <div style="background-color: #EBF5FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; height: 100%;">
+                <h4 style="color: #1E40AF; margin-top: 0;">📝 Executive Summary</h4>
+                <p style="color: #1E3A8A; line-height: 1.6;">{st.session_state['summary']}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # --- PINPOINT STRATEGIC QUERY ---
-        st.divider()
-        st.subheader("💬 Query Session Insights")
-        user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...")
-        if user_q:
-            ctx = st.session_state['current_transcript']
-            sentences = [s.strip() for s in ctx.split('.') if len(s.strip()) > 5]
-            query_words = [w.lower() for w in user_q.split() if len(w) > 3]
-            matches = [s for s in sentences if any(w in s.lower() for w in query_words)]
-
-            st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
-            if matches:
-                st.write(f"**Advisor Response:** Based on the transcript: *{'. '.join(matches[:2])}*")
-            else:
-                st.write("**Advisor Response:** I could not find a specific mention of that in this session.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        with col2:
+            raw_actions = st.session_state['actions'].split('•')
+            clean_actions = "".join([f"<li style='margin-bottom: 8px;'>{a.strip()}</li>" for a in raw_actions if len(a.strip()) > 10])
+            st.markdown(f"""
+            <div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; height: 100%;">
+                <h4 style="color: #166534; margin-top: 0;">🚀 Key Deliverables</h4>
+                <ul style="color: #14532D; padding-left: 20px; line-height: 1.5;">
+                    {clean_actions}
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
