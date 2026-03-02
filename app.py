@@ -1,7 +1,7 @@
 import streamlit as st
 import whisper
 import torch
-from transformers import pipeline
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import sqlite3
 import re
 import tempfile
@@ -112,14 +112,67 @@ db = StrategicDB()
 # 3. AI ENGINE (The "Who" & "To Whom")
 # ==========================================
 @st.cache_resource
-def load_models():
-    # Whisper Base for speed/accuracy balance
-    whisper_model = whisper.load_model("base")
-    # DistilBART for summarization
-    summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=0 if torch.cuda.is_available() else -1)
-    return whisper_model, summarizer
+def load_whisper():
+    """Load Whisper model for transcription."""
+    try:
+        model = whisper.load_model("base")
+        return model
+    except Exception as e:
+        st.error(f"Failed to load Whisper model: {e}")
+        return None
 
-whisper_model, summarizer = load_models()
+@st.cache_resource
+def load_summarizer():
+    """Load DistilBART model directly without pipeline to avoid task registration issues."""
+    try:
+        model_name = "sshleifer/distilbart-cnn-12-6"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        
+        # Move to GPU if available
+        device = 0 if torch.cuda.is_available() else -1
+        if device >= 0:
+            model = model.to(device)
+            
+        return tokenizer, model, device
+    except Exception as e:
+        st.error(f"Failed to load summarization model: {e}")
+        return None, None, -1
+
+whisper_model = load_whisper()
+tokenizer, summarizer_model, device = load_summarizer()
+
+def summarize_text(text):
+    """Summarize text using DistilBART with proper chunking."""
+    if not text or len(text.strip()) < 50:
+        return "Text too short to summarize."
+    
+    max_chunk_length = 1024
+    chunks = [text[i:i+max_chunk_length] for i in range(0, min(len(text), 5000), max_chunk_length)]
+    
+    summaries = []
+    for chunk in chunks:
+        if len(chunk) > 50:
+            try:
+                inputs = tokenizer(chunk, return_tensors="pt", max_length=1024, truncation=True)
+                if device >= 0:
+                    inputs = {k: v.to(device) for k, v in inputs.items()}
+                
+                summary_ids = summarizer_model.generate(
+                    inputs["input_ids"], 
+                    max_length=130, 
+                    min_length=30,
+                    num_beams=4,
+                    length_penalty=2.0,
+                    early_stopping=True
+                )
+                summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+                summaries.append(summary)
+            except Exception as e:
+                st.warning(f"Chunk summarization failed: {e}")
+                continue
+    
+    return " ".join(summaries) if summaries else "Summarization failed."
 
 def extract_speaker_intent(full_text):
     """
@@ -150,32 +203,37 @@ def process_video(uploaded_file, mode):
     3. Analyze (Summarization + Regex)
     4. Structure Data
     """
+    if whisper_model is None or summarizer_model is None:
+        raise RuntimeError("Models not loaded properly. Please restart the application.")
+    
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') 
-    tfile.write(uploaded_file.read())
-    
-    # 1. Transcription
-    result = whisper_model.transcribe(tfile.name)
-    transcript_text = result['text']
-    
-    # 2. Summarization (Chunking for BART limit)
-    # BART limit is 1024 tokens, we chunk text to ~1000 chars
-    chunks = [transcript_text[i:i+1000] for i in range(0, len(transcript_text), 1000)]
-    summary = ""
-    for chunk in chunks:
-        if len(chunk) > 50: # Avoid empty chunks
-            summary += summarizer(chunk, max_length=130, min_length=30, do_sample=False)[0]['summary_text'] + " "
+    try:
+        tfile.write(uploaded_file.read())
+        
+        # 1. Transcription
+        result = whisper_model.transcribe(tfile.name)
+        transcript_text = result['text']
+        
+        # 2. Summarization
+        summary = summarize_text(transcript_text)
+        
+        # 3. Assignment Extraction
+        assignments = extract_speaker_intent(transcript_text)
+        
+        # 4. Strategic Intel Construction
+        intel_data = {
+            "speakers_detected": len(set(re.findall(r"([A-Z][a-z]+)", transcript_text[:500]))),
+            "action_items_count": len(assignments),
+            "duration_estimate": "Unknown"
+        }
 
-    # 3. Assignment Extraction
-    assignments = extract_speaker_intent(transcript_text)
-    
-    # 4. Strategic Intel Construction
-    intel_data = {
-        "speakers_detected": len(set(re.findall(r"([A-Z][a-z]+)", transcript_text[:500]))), # Heuristic
-        "action_items_count": len(assignments),
-        "duration_estimate": "Unknown (Video processing required for duration)"
-    }
-
-    return transcript_text, summary, assignments, intel_data
+        return transcript_text, summary, assignments, intel_data
+    finally:
+        # Cleanup temp file
+        try:
+            os.unlink(tfile.name)
+        except:
+            pass
 
 # ==========================================
 # 4. DOCUMENT ENGINE (ReportLab)
@@ -330,7 +388,6 @@ with tab3:
         query = st.text_input("Ask your question:")
         if query:
             # Simple keyword search + context extraction (Lightweight RAG)
-            # In production, use vector embeddings here
             sentences = all_transcripts.split('.')
             relevant = [s.strip() for s in sentences if query.lower() in s.lower()]
             
