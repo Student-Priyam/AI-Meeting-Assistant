@@ -3,7 +3,6 @@ openai-whisper
 transformers
 torch
 reportlab
-
-
+pydub
 
 
