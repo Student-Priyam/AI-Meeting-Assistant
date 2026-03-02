@@ -1,7 +1,9 @@
-streamlit>=1.28.0
-pandas>=2.1.0
-reportlab>=4.0.0
-openai>=1.0.0
+streamlit
+openai-whisper
+transformers
+torch
+reportlab
+
 
 
 
