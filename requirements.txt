@@ -4,5 +4,5 @@ transformers
 torch
 reportlab
 pydub
-
+audioop-lts
 
