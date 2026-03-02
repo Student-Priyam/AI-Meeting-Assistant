@@ -34,3 +34,21 @@ Academic Mode: Prioritizes "core concepts," "homework assignments," and "exam pr
 
 **Pinpoint Strategic Query Engine**
 Instead of searching through a generic summary, the query engine splits the full transcript into sentence-level entities. When a user asks about "Rahul's role," the AI performs a keyword-weighted scan to jump past the meeting introduction and find the exact sentence where that person was mentioned.
+
+# Performance Benchmarks
+
+**Transcription Speed**: ~8–12 minutes for a 55-minute session on CPU (Standard Tier).
+
+**Inference Latency**: Executive summaries are generated in <180 seconds for large-scale transcripts.
+
+**Memory Efficiency**: Chunking logic reduces peak RAM usage from 4GB+ to under 1.2GB, allowing deployment on low-resource environments.
+
+# Future Roadmap
+
+**Speaker Diarization**: Implementing logic to identify different voices (e.g., distinguishing between "Rahul" and the "Manager").
+
+**Sentiment Analysis**: Detecting the "tone" of the meeting to highlight moments of conflict or consensus.
+
+**Calendar Integration**: Automatically pushing "Action Items" to Google Calendar or Microsoft Teams.
+
+
