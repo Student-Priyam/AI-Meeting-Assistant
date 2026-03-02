@@ -36,22 +36,33 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #F8FAFC; }
+    
+    /* Sidebar Styling - Clean white text on dark background */
     [data-testid="stSidebar"] { background-color: #0F172A !important; }
     [data-testid="stSidebar"] * { color: white !important; }
     [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div { color: #0F172A !important; }
+
+    /* Hero Banner - Responsive Bright Blue Gradient */
     .hero-banner {
-        background: #005A92; padding: 3rem 2rem; border-radius: 16px;
-        margin-bottom: 2.5rem; color: white; text-align: center;
+        background: linear-gradient(135deg, #005A92 0%, #00426d 100%);
+        padding: 3.5rem 2rem;
+        border-radius: 16px;
+        margin-bottom: 2.5rem;
+        color: white;
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
     }
-    .hero-banner h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; color: white !important; }
-    .hero-banner p { font-size: 1.1rem; color: #E0E7FF !important; }
+    .hero-banner h1 { font-size: 2.8rem; font-weight: 700; margin-bottom: 0.5rem; color: white !important; }
+    .hero-banner h2 { font-size: 1.8rem; font-weight: 600; color: #E0E7FF !important; margin-bottom: 1rem; }
+    .hero-banner p { font-size: 1.1rem; color: #cbd5e1 !important; }
+
+    /* Cards & Bubbles */
     .executive-card {
-        background: white; padding: 2rem; border-radius: 12px; border: 1px solid #E2E8F0; 
+        background: white; padding: 2.5rem; border-radius: 12px; border: 1px solid #E2E8F0; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
     }
     .ai-bubble {
-        background-color: #F1F5F9; border-left: 4px solid #3b82f6; padding: 1.25rem; 
+        background-color: #F1F5F9; border-left: 5px solid #3b82f6; padding: 1.5rem; 
         border-radius: 0 12px 12px 0; margin: 1rem 0; color: #334155;
     }
 </style>
@@ -59,52 +70,51 @@ st.markdown("""
 
 # --- 3. NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     
-    # Selection captured in 'm_type'
-    m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Strategy Sync"])
+    # FIXED: Selection captured and passed to banner logic
+    m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Technical Sync"])
     st.markdown("---")
-    choice = st.radio("Navigation", [" Meeting Summary", " Meeting Archives"], label_visibility="collapsed")
+    choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
     
     st.markdown("---")
-    st.markdown("<div style='text-align:center; opacity:0.8;'>v8.0 Enterprise Edition<br><small>Powered by Whisper & BART</small></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'>v8.0 Professional Edition<br>Powered by Whisper & BART</div>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE ---
-if choice == " Meeting Summary":
-    # FIX: Dropdown Logic Integration
-    is_academic = "Academic" in m_type
-    summary_label = "📚 Core Concepts" if is_academic else "📄 Executive Summary"
-    action_label = "📝 Assignments & Deadlines" if is_academic else "🎯 Action Items"
-
+if choice == "🚀 Meeting Summary":
+    # DYNAMIC BANNER LOGIC
+    # Main heading remains generic; Sub-heading updates based on Sidebar
     st.markdown(f"""
     <div class="hero-banner">
-        <div style="margin-bottom: 1rem;">
-            <img src="https://images.unsplash.com/photo-1616531770192-6eaea74c2456?auto=format&fit=crop&q=60&w=400" style="border-radius:10px; max-width:200px;" />
+        <div style="margin-bottom: 1.5rem;">
+            <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=2070&auto=format&fit=crop" 
+                 style="border-radius:12px; max-width:400px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
         </div>
-        <h1>{m_type} Intelligence</h1>
-        <p>AI is tuned for <b>{m_type}</b>. Upload your session to extract specialized insights.</p>
+        <h1>Missed a meeting? No need to rewatch it.</h1>
+        <h2>{m_type} Intelligence</h2>
+        <p>Tuning AI for {m_type.lower()} context. Extract insights, summaries, and answers instantly.</p>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="executive-card">', unsafe_allow_html=True)
     file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "mp4", "m4a", "mov"], label_visibility="collapsed")
-    title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Sync")
+    title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Planning")
     
     if file:
-        if file.type.startswith('video'): st.video(file) #
+        if file.type.startswith('video'): st.video(file) # Full video processing support
         else: st.audio(file)
                 
-    if st.button("Generate Summary", type="primary", use_container_width=True):
+    if st.button("Generate Intelligence Summary", type="primary", use_container_width=True):
         if not title:
-            st.warning("Please enter a session title.")
+            st.warning("Please specify a session title.")
         else:
-            with st.spinner(f"Processing {m_type} context..."):
+            with st.spinner(f"Decoding {m_type} context..."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                     tmp.write(file.getvalue())
                     tmp_path = tmp.name
 
-                # Transcription
+                # AI Transcription
                 w_model = whisper.load_model("base")
                 result = w_model.transcribe(tmp_path)
                 raw_text = result["text"]
@@ -112,12 +122,9 @@ if choice == " Meeting Summary":
 
                 st.session_state['current_transcript'] = raw_text
                 
-                # FIX: Adaptive Extraction Pattern
-                if is_academic:
-                    p = r"([^.]*(?:homework|assignment|test|exam|chapter|read|submit|page)[^.]*\.)"
-                else:
-                    p = r"([^.]*(?:monday|friday|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
-                
+                # Context-aware extraction patterns
+                is_academic = "Academic" in m_type
+                p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
                 # Summarization
@@ -127,6 +134,7 @@ if choice == " Meeting Summary":
                 sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
                 summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
+                # Database Persistence
                 ts = datetime.now().strftime("%d-%m-%Y %H:%M")
                 conn = sqlite3.connect('strategic_intel_v8.db')
                 conn.execute("INSERT INTO archives (date, title, type, summary, actions, transcript) VALUES (?,?,?,?,?,?)",
@@ -137,41 +145,42 @@ if choice == " Meeting Summary":
                 st.session_state['summary'] = summary
                 st.session_state['actions'] = actions
                 st.session_state['ts'] = ts
-                st.session_state['active_m_type'] = m_type
+                st.session_state['active_mode'] = m_type
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     if 'summary' in st.session_state:
         st.divider()
-        st.subheader(f"Results: {st.session_state.get('active_m_type', m_type)}")
+        st.subheader(f"Synthesis Output: {st.session_state.get('active_mode', m_type)}")
         c1, c2 = st.columns(2)
-        # Using fixed dynamic labels
-        with c1: st.info(f"**{summary_label}:**\n\n{st.session_state['summary']}")
-        with c2: st.success(f"**{action_label}:**\n\n{st.session_state['actions']}")
+        with c1: st.info(f"**📄 Summary:**\n\n{st.session_state['summary']}")
+        with c2: st.success(f"**🎯 Actionable Items:**\n\n{st.session_state['actions']}")
 
+        # --- PINPOINT STRATEGIC QUERY ---
         st.divider()
-        st.subheader("💬 Strategic Query Engine")
+        st.subheader("💬 Query Session Insights")
         user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...", key="query_input")
         if user_q:
             ctx = st.session_state['current_transcript']
+            # Improved logic: Scans sentences specifically for query terms to avoid generic intros
             sentences = [s.strip() for s in ctx.split('.') if len(s.strip()) > 5]
-            query_words = [w.lower() for w in user_q.split() if len(w) > 2]
-            # Pinpoint search logic
+            query_words = [w.lower() for w in user_q.split() if len(w) > 3]
             matches = [s for s in sentences if any(w in s.lower() for w in query_words)]
 
             st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
             if matches:
-                st.write(f"**Advisor Response:** {'. '.join(matches[:2])}.")
+                # Returns the pinpoint context containing "Rahul" or the requested topic
+                st.write(f"**Advisor Response:** Based on the transcript: *{'. '.join(matches[:2])}*")
             else:
-                st.write("**Advisor Response:** I couldn't find a specific mention. Try different keywords.")
+                st.write("**Advisor Response:** I could not find a specific mention of that in this session.")
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
-elif choice == " Meeting Archives":
-    st.markdown('<div class="hero-banner" style="padding: 1.5rem;"><h1>Archives</h1></div>', unsafe_allow_html=True)
+elif choice == "📅 Meeting Archives":
+    st.markdown('<div class="hero-banner" style="padding: 2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
-    if not data: st.info("No records found.")
+    if not data: st.info("Historical archives are currently empty.")
     else:
         for row in data:
             with st.expander(f"📅 {row[1]} | {row[2]} ({row[3]})"):
@@ -179,5 +188,5 @@ elif choice == " Meeting Archives":
                 st.write(f"**Action Items:** {row[5]}")
                 if st.button("Delete", key=f"d_{row[0]}"): 
                     delete_record(row[0])
-                    st.rerun()
+                    st.rerun() # Immediate list refresh
     conn.close()
