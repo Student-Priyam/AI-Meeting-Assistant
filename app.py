@@ -77,18 +77,18 @@ st.markdown("""
 
 # --- 3. NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center;'>STRATEGIC MINUTES</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     
     m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Strategy Sync"])
     st.markdown("---")
-    choice = st.radio("Navigation", ["🚀 Intelligence Suite", "📅 Meeting Archives"], label_visibility="collapsed")
+    choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
     
     st.markdown("---")
     st.markdown("<div style='text-align:center; opacity:0.8;'>v8.0 Enterprise Edition<br><small>Powered by Whisper & BART</small></div>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE ---
-if choice == "🚀 Intelligence Suite":
+if choice == "🚀 Meeting Summary":
     st.markdown("""
     <div class="hero-banner">
         <div style="margin-bottom: 1rem;">
@@ -107,7 +107,7 @@ if choice == "🚀 Intelligence Suite":
         if file.type.startswith('video'): st.video(file) 
         else: st.audio(file)
                 
-    if st.button("🚀 Process Intelligence", type="primary", use_container_width=True):
+    if st.button("🚀 Process Summary", type="primary", use_container_width=True):
         if not title:
             st.warning("Please enter a session title.")
         else:
@@ -185,4 +185,5 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
+
 
