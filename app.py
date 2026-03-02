@@ -92,7 +92,7 @@ if choice == "🚀 Meeting Summary":
     st.markdown("""
     <div class="hero-banner">
         <div style="margin-bottom: 1rem;">
-            <img src="https://th.bing.com/th/id/OIP.9XZAt42ZiJiPX-2LBq-msgHaE8?w=227&h=180&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3" width=500 />
+            <img src="https://th.bing.com/th/id/OIP.9XZAt42ZiJiPX-2LBq-msgHaE8?w=227&h=180&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3"/>
         </div>
         <h1>Missed a meeting? No need to rewatch it.</h1>
         <p>Upload your audio or video. We'll extract the insights and answer your questions instantly.</p>
@@ -185,6 +185,7 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
+
 
 
 
