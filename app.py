@@ -28,10 +28,10 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2. PREMIUM UI/UX CONFIG (FIXED CSS) ---
+# --- 2. PREMIUM UI/UX CONFIG (FIXED CSS LEAK) ---
 st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
 
-# FIXED: Removed the stray characters causing the text leak at the top
+# This block fixes the text leak at the top of your screen
 st.markdown("""
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -66,7 +66,7 @@ with st.sidebar:
     st.markdown("---")
     st.caption("v8.0 Enterprise Edition")
 
-# --- TAB 1: INTELLIGENCE SUITE + PINPOINT QUERY ---
+# --- TAB 1: INTELLIGENCE SUITE + INTEGRATED QUERY ---
 if choice == "🚀 Intelligence Suite":
     st.markdown("""
     <div class="hero-banner">
@@ -77,10 +77,10 @@ if choice == "🚀 Intelligence Suite":
 
     st.markdown('<div class="executive-card">', unsafe_allow_html=True)
     file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "mp4", "m4a", "mov"], label_visibility="collapsed")
-    title = st.text_input("Session Title", placeholder="e.g., Q1 Operations Sync")
+    title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Sync")
     
     if file:
-        if file.type.startswith('video'): st.video(file) # Supports Video Input
+        if file.type.startswith('video'): st.video(file) # Full video support
         else: st.audio(file)
                 
     if st.button("🚀 Process Intelligence", type="primary", use_container_width=True):
@@ -94,9 +94,10 @@ if choice == "🚀 Intelligence Suite":
             raw_text = result["text"]
             os.remove(tmp_path)
 
+            # Store in session for the live query box
             st.session_state['current_transcript'] = raw_text
 
-            # Adaptive Keyword Extraction
+            # Adaptive context extraction
             p = r"([^.]*(?:monday|friday|deadline|will|must|homework|assignment|submit|due|by|tasked|decided)[^.]*\.)"
             actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
@@ -123,26 +124,26 @@ if choice == "🚀 Intelligence Suite":
         st.divider()
         st.subheader("Executive Synthesis")
         c1, c2 = st.columns(2)
-        # Dynamic labels based on Workspace Type
+        # Dynamic labeling based on Workspace
         with c1: st.info(f"**{ '📚 Concepts' if 'Academic' in m_type else '📄 Summary' }:**\n\n{st.session_state['summary']}")
         with c2: st.success(f"**{ '📝 Assignments' if 'Academic' in m_type else '🎯 Actions' }:**\n\n{st.session_state['actions']}")
 
-        # Pinpoint Query Logic
         st.divider()
-        st.subheader("💬 Query Content")
+        st.subheader("💬 Query Session Context")
         user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...")
         if user_q:
             ctx = st.session_state['current_transcript']
+            # Pinpoint extraction: Filters specifically for keywords in your query
             sentences = [s.strip() for s in ctx.split('.') if len(s.strip()) > 5]
             query_words = [w.lower() for w in user_q.split() if len(w) > 3]
-            # Filters specific context, avoiding generic intros
             matches = [s for s in sentences if any(w in s.lower() for w in query_words)]
 
             st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
             if matches:
+                # Returns pinpoint data, skipping the "Today is March 2nd..." intro
                 st.write(f"**Advisor Response:** Based on the transcript: *{'. '.join(matches[:2])}*")
             else:
-                st.write("**Advisor Response:** Context found, but no specific mention of those terms.")
+                st.write("**Advisor Response:** No direct mention found in this session.")
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
