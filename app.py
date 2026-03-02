@@ -15,7 +15,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 def init_db():
     conn = sqlite3.connect('strategic_intel_final.db')
     c = conn.cursor()
-    # Schema includes 'type' for classification
     c.execute('''CREATE TABLE IF NOT EXISTS archives 
                  (id INTEGER PRIMARY KEY, date TEXT, title TEXT, type TEXT, summary TEXT, actions TEXT, transcript TEXT)''')
     conn.commit()
@@ -29,28 +28,44 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2. PREMIUM UI/UX CONFIG (THE ABSOLUTE FIX) ---
+# --- 2. PREMIUM UI/UX CONFIG (FIXED CSS & COLORS) ---
 st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
 
-# THE FIX: Using a single, clean block for CSS to stop the text leak
+# FIXED: Corrected CSS injection and sidebar text colors
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #F8FAFC; }
-    [data-testid="stSidebar"] { background-color: #0F172A !important; color: white !important; }
-    .hero-banner {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        padding: 3rem 2rem; border-radius: 16px; margin-bottom: 2.5rem; color: white;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); text-align: center;
+    
+    /* Sidebar Styling - Making everything white on dark background */
+    [data-testid="stSidebar"] { 
+        background-color: #0F172A !important; 
     }
+    [data-testid="stSidebar"] section[data-testid="stSidebarNav"] span,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] h2 {
+        color: white !important;
+    }
+    
+    /* Executive Cards */
     .executive-card {
         background: white; padding: 2rem; border-radius: 12px; border: 1px solid #E2E8F0; 
         box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
     }
+    
+    /* AI Response Bubble */
     .ai-bubble {
         background-color: #F1F5F9; border-left: 4px solid #3b82f6; padding: 1.25rem; 
         border-radius: 0 12px 12px 0; margin: 1rem 0; color: #334155;
+    }
+    
+    /* Hero Banner */
+    .hero-banner {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        padding: 3rem 2rem; border-radius: 16px; margin-bottom: 2.5rem; color: white;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -62,7 +77,7 @@ with st.sidebar:
     m_type = st.selectbox("Meeting Type", ["Corporate Meeting", "Academic Class", "Strategy Sync"])
     choice = st.radio("Navigation", ["🚀 Intelligence Suite", "📅 Meeting Archives"], label_visibility="collapsed")
     st.markdown("---")
-    st.caption("v8.0 Enterprise Edition")
+    st.markdown("<p style='color:#94a3b8; font-size:12px; text-align:center;'>v8.0 Enterprise Edition</p>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE + PINPOINT QUERY ---
 if choice == "🚀 Intelligence Suite":
@@ -78,7 +93,7 @@ if choice == "🚀 Intelligence Suite":
     title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Sync")
     
     if file:
-        if file.type.startswith('video'): st.video(file) # Full video support
+        if file.type.startswith('video'): st.video(file) 
         else: st.audio(file)
                 
     if st.button("🚀 Process Intelligence", type="primary", use_container_width=True):
@@ -92,10 +107,8 @@ if choice == "🚀 Intelligence Suite":
             raw_text = result["text"]
             os.remove(tmp_path)
 
-            # Store in session state
             st.session_state['current_transcript'] = raw_text
 
-            # Adaptive context extraction patterns
             p = r"([^.]*(?:monday|friday|deadline|will|must|homework|assignment|submit|due|by|tasked|decided)[^.]*\.)"
             actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
@@ -122,26 +135,25 @@ if choice == "🚀 Intelligence Suite":
         st.divider()
         st.subheader("Executive Synthesis")
         c1, c2 = st.columns(2)
-        # Adaptive UI labels
         with c1: st.info(f"**{ '📚 Concepts' if 'Academic' in m_type else '📄 Summary' }:**\n\n{st.session_state['summary']}")
         with c2: st.success(f"**{ '📝 Assignments' if 'Academic' in m_type else '🎯 Actions' }:**\n\n{st.session_state['actions']}")
 
         st.divider()
         st.subheader("💬 Query Session Context")
-        user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...", key="live_query_box")
+        user_q = st.text_input("Ask about Rahul's role, deadlines, or specific decisions...", key="query_input")
         if user_q:
             ctx = st.session_state['current_transcript']
-            # Pinpoint search logic
+            # PINPOINT SEARCH: Scans transcript specifically for your question
             sentences = [s.strip() for s in ctx.split('.') if len(s.strip()) > 5]
             query_words = [w.lower() for w in user_q.split() if len(w) > 3]
             matches = [s for s in sentences if any(w in s.lower() for w in query_words)]
 
             st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
             if matches:
-                # Returns specific data found, skipping intro
+                # Jumps past the intro to find the actual answer
                 st.write(f"**Advisor Response:** Based on the transcript: *{'. '.join(matches[:2])}*")
             else:
-                st.write("**Advisor Response:** I could not find a specific mention of that in this session.")
+                st.write("**Advisor Response:** Context found, but no specific mention of those terms.")
             st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2: ARCHIVES ---
