@@ -51,4 +51,8 @@ Instead of searching through a generic summary, the query engine splits the full
 
 **Calendar Integration**: Automatically pushing "Action Items" to Google Calendar or Microsoft Teams.
 
+## 🌐 Live Demo
+You can access the live application here: 
+[On Streamlit Cloud] : https://ai-meeting-assistant-2222.streamlit.app/
+
 
