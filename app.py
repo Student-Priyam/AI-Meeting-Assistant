@@ -11,46 +11,115 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-# --- 1. DATABASE SYSTEM (Universal Storage) ---
+# --- 1. GLOBAL UI & UX CONFIGURATION (Premium SaaS Style) ---
+st.set_page_config(
+    page_title="Strategic Meeting Intelligence",
+    page_icon="💼",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for the "Executive Slate" Design System
+st.markdown("""
+    <style>
+    /* Import Enterprise Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #F5F7FA !important;
+    }
+
+    /* Fixed Left Sidebar (240px) */
+    [data-testid="stSidebar"] {
+        background-color: #FFFFFF !important;
+        border-right: 1px solid #E6EAF0;
+        min-width: 240px !important;
+    }
+
+    /* Sidebar Active State Styling */
+    .st-emotion-cache-16idsys p {
+        font-weight: 500;
+        color: #1E2A38;
+    }
+
+    /* Executive Card Styling */
+    .executive-card {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 12px;
+        border: 1px solid #E6EAF0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        margin-bottom: 2rem;
+    }
+
+    /* Typography Hierarchy */
+    .page-title { color: #1E2A38; font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    .page-subtitle { color: #64748B; font-size: 16px; margin-bottom: 32px; }
+
+    /* Buttons: Electric Blue Accent */
+    .stButton>button {
+        background-color: #4F7CFF !important;
+        color: white !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 0.6rem 2rem !important;
+        font-weight: 600 !important;
+        transition: 0.2s ease-in-out;
+    }
+    .stButton>button:hover {
+        background-color: #3D62D6 !important;
+        box-shadow: 0 4px 12px rgba(79, 124, 255, 0.3);
+    }
+
+    /* Status Badge: Success Green */
+    .badge-processed {
+        background-color: #ECFDF5;
+        color: #059669;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. CORE SYSTEM LOGIC ---
 def init_db():
-    conn = sqlite3.connect('universal_meetings.db')
+    conn = sqlite3.connect('strategic_intel.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS archives 
                  (id INTEGER PRIMARY KEY, date TEXT, title TEXT, summary TEXT, actions TEXT, transcript TEXT)''')
     conn.commit()
     conn.close()
 
-def delete_entry(entry_id):
-    conn = sqlite3.connect('universal_meetings.db')
-    c = conn.cursor()
-    c.execute("DELETE FROM archives WHERE id=?", (entry_id,))
-    conn.commit()
-    conn.close()
-
-# --- 2. PROFESSIONAL PDF ARCHITECTURE ---
+# FIX: Stable PDF Generation (Resolved AttributeError)
 def generate_pdf(title, summary, actions, date):
     pdf_path = f"MoM_{date.replace(':', '-')}.pdf"
     doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
 
-    # Professional Typography
-    h1 = ParagraphStyle('H1', fontSize=22, textColor=colors.hexColor("#1e293b"), spaceAfter=20, fontName="Helvetica-Bold")
-    h2 = ParagraphStyle('H2', fontSize=14, textColor=colors.hexColor("#2563eb"), spaceBefore=15, spaceAfter=10, fontName="Helvetica-Bold")
-    body = ParagraphStyle('B', fontSize=10, leading=14)
+    # Using Hex colors safely via direct assignment
+    primary_color = colors.Color(red=(30/255), green=(42/255), blue=(56/255)) # #1E2A38
+    accent_color = colors.Color(red=(79/255), green=(124/255), blue=(255/255)) # #4F7CFF
 
-    story.append(Paragraph("STRATEGIC MEETING SUMMARY", h1))
-    story.append(Paragraph(f"<b>REFERENCE:</b> {title.upper()}", body))
-    story.append(Paragraph(f"<b>TIMESTAMP:</b> {date}", body))
-    story.append(Spacer(1, 25))
+    h1_style = ParagraphStyle('H1', fontSize=22, textColor=primary_color, spaceAfter=20, fontName="Helvetica-Bold")
+    h2_style = ParagraphStyle('H2', fontSize=14, textColor=accent_color, spaceBefore=15, spaceAfter=10, fontName="Helvetica-Bold")
+    body_style = ParagraphStyle('B', fontSize=10, leading=14, fontName="Helvetica")
 
-    story.append(Paragraph("EXECUTIVE OVERVIEW", h2))
-    story.append(Paragraph(summary, body))
+    story.append(Paragraph("STRATEGIC MEETING INTELLIGENCE", h1_style))
+    story.append(Paragraph(f"<b>REFERENCE:</b> {title.upper()}", body_style))
+    story.append(Paragraph(f"<b>TIMESTAMP:</b> {date}", body_style))
+    story.append(Spacer(1, 24))
+
+    story.append(Paragraph("EXECUTIVE SUMMARY", h2_style))
+    story.append(Paragraph(summary, body_style))
     story.append(Spacer(1, 20))
 
-    story.append(Paragraph("ACTION ITEMS & DELIVERABLES", h2))
-    # Table logic for structured MoM
-    table_data = [["REF", "TASK DESCRIPTION / DEADLINE"]]
+    story.append(Paragraph("ACTION ITEMS & DELIVERABLES", h2_style))
+    
+    table_data = [["REF", "DESCRIPTION / DEADLINE"]]
     for i, item in enumerate(actions.split('\n'), 1):
         if item.strip():
             table_data.append([str(i), item.strip()])
@@ -58,9 +127,9 @@ def generate_pdf(title, summary, actions, date):
     if len(table_data) > 1:
         t = Table(table_data, colWidths=[40, 440])
         t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.hexColor("#f8fafc")),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.hexColor("#1e293b")),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.silver),
+            ('BACKGROUND', (0,0), (-1,0), colors.Color(0.96, 0.97, 0.98)),
+            ('TEXTCOLOR', (0,0), (-1,0), primary_color),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.lightgrey),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
             ('PADDING', (0,0), (-1,-1), 8),
         ]))
@@ -71,135 +140,120 @@ def generate_pdf(title, summary, actions, date):
 
 init_db()
 
-# --- 3. PREMIUM UI/UX (Slate & Glass Theme) ---
-st.set_page_config(page_title="Strategic Meeting Intelligence", layout="wide")
-
-st.markdown("""
-    <style>
-    .stApp { background-color: #f8fafc; }
-    [data-testid="stSidebar"] { background-color: #0f172a; border-right: 1px solid #e2e8f0; }
-    .main-header { color: #0f172a; font-size: 2.5rem; font-weight: 800; margin-bottom: 2rem; }
-    
-    /* Professional Card Containers */
-    .content-card {
-        background: white; padding: 2.5rem; border-radius: 12px;
-        border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem; color: #1e293b;
-    }
-    .stButton>button {
-        background-color: #2563eb; color: white; border-radius: 6px;
-        width: 100%; border: none; font-weight: 600; padding: 0.7rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 4. NAVIGATION ---
+# --- 3. WORKSPACE NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='color:white; text-align:center;'>💼 Workspace</h2>", unsafe_allow_html=True)
-    mode = st.radio("Switch View", ["🚀 New Intelligence", "📅 Meeting Archives", "💬 Strategic Advisor"])
+    st.markdown("<h2 style='color:#1E2A38; margin-top:0;'>💼 Workspace</h2>", unsafe_allow_html=True)
+    mode = st.radio("Navigation", ["🚀 Intelligence Suite", "📅 Meeting Archives", "💬 Strategic Advisor"], label_visibility="collapsed")
     st.markdown("---")
-    st.caption("Universal Framework v5.0")
+    st.caption("Strategic Intel v5.0 • Enterprise Edition")
 
-# --- TAB 1: GENERATE NEW INTELLIGENCE ---
-if mode == "🚀 New Intelligence":
-    st.markdown("<h1 class='main-header'>Analysis Suite</h1>", unsafe_allow_html=True)
-    st.markdown('<div class="content-card">', unsafe_allow_html=True)
+# --- 4. PAGE 1: INTELLIGENCE SUITE ---
+if mode == "🚀 Intelligence Suite":
+    st.markdown('<h1 class="page-title">Turn Meetings Into Strategic Insights</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Upload your meeting and generate structured summaries instantly.</p>', unsafe_allow_html=True)
     
-    file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"])
-    title = st.text_input("Meeting Reference Name", placeholder="e.g. Project Delivery Discussion")
+    st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+    file = st.file_uploader("Upload Meeting Audio/Video", type=["mp3", "wav", "mp4", "m4a"], label_visibility="collapsed")
+    title = st.text_input("Meeting Subject / Project Name", placeholder="e.g. Q1 Operations Review")
     
-    if file and st.button("🚀 Process & Synthesize"):
-        with st.spinner("AI is analyzing context and strategic intent..."):
+    if file and st.button("🚀 Process Intelligence"):
+        with st.spinner("AI is synthesizing strategic intent..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                 tmp.write(file.getvalue())
                 tmp_path = tmp.name
 
-            # Transcription & Summary Engine
+            # Transcription & AI Logic
             w_model = whisper.load_model("base")
             result = w_model.transcribe(tmp_path)
             raw_text = result["text"]
             os.remove(tmp_path)
 
-            # Generic Pattern Matching (Will capture Dates, Days, Deadlines)
-            patterns = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete|final|at)[^.]*\.)"
-            extracted_actions = "\n".join([a.strip() for a in re.findall(patterns, raw_text, re.I)])
+            patterns = r"([^.]*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|will|must|deadline|by|due|schedule|complete|final)[^.]*\.)"
+            actions = "\n".join([a.strip() for a in re.findall(patterns, raw_text, re.I)])
 
-            # Executive Summarization
             tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
             s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
             inputs = tokenizer("summarize: " + raw_text[:2500], return_tensors="pt", max_length=1024, truncation=True)
             sum_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
             summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
-            # Persistent Storage
+            # DB Save
             ts = datetime.now().strftime("%d-%m-%Y %H:%M")
-            conn = sqlite3.connect('universal_meetings.db')
+            conn = sqlite3.connect('strategic_intel.db')
             conn.execute("INSERT INTO archives (date, title, summary, actions, transcript) VALUES (?,?,?,?,?)",
-                         (ts, title, summary, extracted_actions, raw_text))
+                         (ts, title, summary, actions, raw_text))
             conn.commit()
             conn.close()
 
-            st.success("Intelligence recorded successfully.")
-            pdf_out = generate_pdf(title, summary, extracted_actions, ts)
-            with open(pdf_out, "rb") as f:
-                st.download_button("📥 Download Professional MoM (PDF)", f, file_name=f"{title}.pdf")
+            st.toast("✅ Meeting Intelligence Synchronized")
+            
+            # Show Result in Clean Tabs
+            t1, t2, t3 = st.tabs(["📄 Summary", "🎯 Action Items", "📥 Export"])
+            with t1: st.markdown(f'<div class="ai-bubble">{summary}</div>', unsafe_allow_html=True)
+            with t2: st.markdown(f'<div class="ai-bubble">{actions if actions else "No specific actions found."}</div>', unsafe_allow_html=True)
+            with t3:
+                pdf_out = generate_pdf(title, summary, actions, ts)
+                with open(pdf_out, "rb") as f:
+                    st.download_button("Download PDF", f, file_name=f"{title}_MoM.pdf")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TAB 2: ARCHIVES (View & Manage) ---
+# --- 5. PAGE 2: ARCHIVE CENTER ---
 elif mode == "📅 Meeting Archives":
-    st.markdown("<h1 class='main-header'>Intelligence Repository</h1>", unsafe_allow_html=True)
-    conn = sqlite3.connect('universal_meetings.db')
+    st.markdown('<h1 class="page-title">Meeting Archives</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Your processed meetings with structured historical data.</p>', unsafe_allow_html=True)
+    
+    conn = sqlite3.connect('strategic_intel.db')
     data = conn.execute("SELECT id, date, title, summary, actions FROM archives ORDER BY id DESC").fetchall()
     
     if not data:
-        st.info("Archives are currently empty. Process a meeting to begin.")
+        st.info("Your processed meetings will appear here.")
     else:
         for row in data:
-            st.markdown('<div class="content-card">', unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([4, 1.2, 0.8])
-            with c1:
-                st.markdown(f"### {row[2]}")
-                st.caption(f"📅 Record Date: {row[1]}")
-            with c2:
-                if st.button("Edit / Details", key=f"e_{row[0]}"):
-                    st.session_state[f"edit_box_{row[0]}"] = not st.session_state.get(f"edit_box_{row[0]}", False)
-            with c3:
-                if st.button("🗑️ Delete", key=f"d_{row[0]}"):
-                    delete_entry(row[0])
-                    st.rerun()
-
-            if st.session_state.get(f"edit_box_{row[0]}", False):
-                new_s = st.text_area("Edit Summary", row[3], height=150, key=f"s_area_{row[0]}")
-                new_a = st.text_area("Edit Action Items", row[4], height=150, key=f"a_area_{row[0]}")
-                if st.button("Save Changes", key=f"save_btn_{row[0]}"):
-                    c = conn.cursor()
-                    c.execute("UPDATE archives SET summary=?, actions=? WHERE id=?", (new_s, new_a, row[0]))
-                    conn.commit()
-                    st.toast("Updated Successfully!")
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.container():
+                st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+                col1, col2, col3 = st.columns([4, 1.5, 0.5])
+                with col1:
+                    st.markdown(f"**{row[2]}**")
+                    st.caption(f"📅 {row[1]} • <span class='badge-processed'>Processed</span>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("Review", key=f"r_{row[0]}"):
+                        st.session_state[f"exp_{row[0]}"] = not st.session_state.get(f"exp_{row[0]}", False)
+                with col3:
+                    if st.button("🗑️", key=f"d_{row[0]}"):
+                        conn.execute("DELETE FROM archives WHERE id=?", (row[0],))
+                        conn.commit()
+                        st.rerun()
+                
+                if st.session_state.get(f"exp_{row[0]}", False):
+                    st.markdown(f"**AI Summary:** {row[3]}")
+                    st.markdown(f"**Actions:** {row[4]}")
+                st.markdown('</div>', unsafe_allow_html=True)
     conn.close()
 
-# --- TAB 3: STRATEGIC ADVISOR (Fixed & Functional) ---
+# --- 6. PAGE 3: STRATEGIC ADVISOR (Chat Bot) ---
 elif mode == "💬 Strategic Advisor":
-    st.markdown("<h1 class='main-header'>Contextual Intelligence</h1>", unsafe_allow_html=True)
-    conn = sqlite3.connect('universal_meetings.db')
-    rows = conn.execute("SELECT title, transcript FROM archives").fetchall()
-    options = {r[0]: r[1] for r in rows} # Fixed Indexing
+    st.markdown('<h1 class="page-title">Strategic Advisor</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="page-subtitle">Query past meeting intelligence using natural language.</p>', unsafe_allow_html=True)
     
-    if options:
-        st.markdown('<div class="content-card">', unsafe_allow_html=True)
-        selection = st.selectbox("Select Meeting Archive", list(options.keys()))
-        query = st.text_input("Ask a question about the decisions in this meeting...")
+    conn = sqlite3.connect('strategic_intel.db')
+    rows = conn.execute("SELECT title, transcript FROM archives").fetchall()
+    recs = {r[0]: r[1] for r in rows}
+    
+    if recs:
+        st.markdown('<div class="executive-card">', unsafe_allow_html=True)
+        sel = st.selectbox("Choose Meeting Context", list(recs.keys()))
+        query = st.text_input("Consult with AI about this meeting...", placeholder="e.g. What was the decision on the budget?")
         
         if query:
-            context = options[selection]
-            # Semantic keyword scanning
-            results = [s for s in context.split('.') if any(w.lower() in s.lower() for w in query.split())]
-            if results:
-                st.info(f"**AI Insight:** {'. '.join(results[:2])}.")
+            ctx = recs[sel]
+            matches = [s for s in ctx.split('.') if any(w.lower() in s.lower() for w in query.split())]
+            st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
+            if matches:
+                st.write(f"**Advisor Response:** Based on the transcript, {'. '.join(matches[:2])}.")
             else:
-                st.warning("No specific mention found. Try using keywords like 'budget', 'deadline', or 'final'.")
+                st.write("**Advisor Response:** I could not find a specific mention of that topic in this meeting.")
+            st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Please process a recording first to enable the Strategic Advisor.")
+        st.info("Process a meeting recording first to enable the Advisor.")
     conn.close()
