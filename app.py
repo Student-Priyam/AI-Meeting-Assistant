@@ -31,16 +31,29 @@ init_db()
 # --- 2. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
 
+# --- 2. PREMIUM UI/UX CONFIG (FIXED DROPDOWN VISIBILITY) ---
+st.set_page_config(page_title="Strategic Intel | AI Meeting Assistant", layout="wide", page_icon="💼")
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
     .stApp { background-color: #F8FAFC; }
     
-    /* Sidebar Styling - Clean white text on dark background */
+    /* Sidebar Styling */
     [data-testid="stSidebar"] { background-color: #0F172A !important; }
     [data-testid="stSidebar"] * { color: white !important; }
-    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div { color: #0F172A !important; }
+
+    /* FIX: This specific block makes the dropdown text visible */
+    div[data-baseweb="select"] > div {
+        background-color: white !important;
+        color: #0F172A !important; /* Dark text for the selected item */
+    }
+    
+    /* This ensures the list items inside the dropdown are also dark */
+    ul[data-baseweb="menu"] li {
+        color: #0F172A !important;
+    }
 
     /* Hero Banner - Responsive Bright Blue Gradient */
     .hero-banner {
@@ -190,4 +203,5 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun() # Immediate list refresh
     conn.close()
+
 
