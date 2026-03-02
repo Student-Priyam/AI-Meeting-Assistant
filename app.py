@@ -111,7 +111,6 @@ with st.sidebar:
 
 # --- TAB 1: INTELLIGENCE SUITE ---
 if choice == "🚀 Meeting Summary":
-    # INTEGRATED YOUR REQUESTED IMAGE LINK HERE
     st.markdown(f"""
     <div class="hero-banner">
         <div style="margin-bottom: 1.5rem;">
@@ -192,6 +191,30 @@ if choice == "🚀 Meeting Summary":
             </div>
             """, unsafe_allow_html=True)
 
+        # --- TEXT FILE DOWNLOAD LOGIC ---
+        st.divider()
+        report_content = f"""STRATEGIC INTELLIGENCE REPORT
+TITLE: {st.session_state.get('title', 'Meeting Session')}
+DATE: {st.session_state['ts']}
+TYPE: {st.session_state.get('active_mode', m_type)}
+
+--- EXECUTIVE SUMMARY ---
+{st.session_state['summary']}
+
+--- KEY DELIVERABLES ---
+{st.session_state['actions']}
+
+--- FULL TRANSCRIPT ---
+{st.session_state['current_transcript']}
+"""
+        st.download_button(
+            label="📥 Download Intelligence Report (.txt)",
+            data=report_content,
+            file_name=f"Strategic_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+
 # --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding: 2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
@@ -206,4 +229,3 @@ elif choice == "📅 Meeting Archives":
                 if st.button("Delete", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
-
