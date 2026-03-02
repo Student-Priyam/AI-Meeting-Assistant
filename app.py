@@ -88,8 +88,8 @@ if choice == "🚀 Meeting Summary":
     st.markdown(f"""
     <div class="hero-banner">
         <div style="margin-bottom: 1.5rem;">
-            <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?q=80&w=2070&auto=format&fit=crop" 
-                 style="border-radius:12px; max-width:400px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
+            <img src="https://images.unsplash.com/opengraph/1x1.png?blend=https:%2F%2Fimages.unsplash.com%2Fphoto-1616531770192-6eaea74c2456%3Fblend%3D000000%26blend-alpha%3D10%26blend-mode%3Dnormal%26crop%3Dfaces%252Cedges%26h%3D630%26mark%3Dhttps%253A%252F%252Fimages.unsplash.com%252Fopengraph%252Fsearch-input.png%253Fh%253D84%2526txt%253Donline%252Bmeeting%2526txt-align%253Dmiddle%25252Cleft%2526txt-clip%253Dellipsis%2526txt-color%253D000000%2526txt-pad%253D80%2526txt-size%253D40%2526txt-width%253D660%2526w%253D750%2526auto%253Dformat%2526fit%253Dcrop%2526q%253D60%26mark-align%3Dmiddle%252Ccenter%26mark-w%3D750%26w%3D1200%26auto%3Dformat%26fit%3Dcrop%26q%3D60%26ixid%3DM3wxMjA3fDB8MXxzZWFyY2h8Nnx8b25saW5lJTIwbWVldGluZ3xlbnwwfHx8fDE3MTk5MDk3NjZ8MA%26ixlib%3Drb-4.0.3&blend-w=1&h=630&mark=https:%2F%2Fimages.unsplash.com%2Fopengraph%2Flogo.png&mark-align=top%2Cleft&mark-pad=50&mark-w=64&w=1200&auto=format&fit=crop&q=60" 
+                 style="border-radius:12px; max-width:600px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
         </div>
         <h1>Missed a meeting? No need to rewatch it.</h1>
         <h2>{m_type} Intelligence</h2>
@@ -190,3 +190,4 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun() # Immediate list refresh
     conn.close()
+
