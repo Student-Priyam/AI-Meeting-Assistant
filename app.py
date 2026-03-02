@@ -1,139 +1,149 @@
 import streamlit as st
 import whisper
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 import re
 import os
+import sqlite3
+from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
-# --- 1. ENTERPRISE UI & UX CONFIG ---
-st.set_page_config(page_title="Pro Meeting Intelligence", page_icon="💼", layout="wide")
+# --- 1. DATABASE SETUP ---
+def init_db():
+    conn = sqlite3.connect('meetings.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS meeting_history 
+                 (id INTEGER PRIMARY KEY, date TEXT, title TEXT, summary TEXT, actions TEXT, transcript TEXT)''')
+    conn.commit()
+    conn.close()
 
+init_db()
+
+# --- 2. PDF GENERATOR ---
+def create_pdf(title, summary, actions, date):
+    pdf_path = f"Meeting_Minutes_{date}.pdf"
+    c = canvas.Canvas(pdf_path, pagesize=letter)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, 750, "OFFICIAL MEETING MINUTES")
+    c.setFont("Helvetica", 12)
+    c.drawString(100, 730, f"Date: {date}")
+    c.drawString(100, 715, f"Subject: {title}")
+    
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(100, 680, "Executive Summary:")
+    c.setFont("Helvetica", 11)
+    text_obj = c.beginText(100, 660)
+    text_obj.textLines(summary[:1000]) # Simplified for brevity
+    c.drawText(text_obj)
+    
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(100, 500, "Action Items:")
+    c.setFont("Helvetica", 11)
+    y = 480
+    for item in actions.split('\n'):
+        c.drawString(120, y, f"• {item}")
+        y -= 15
+    c.save()
+    return pdf_path
+
+# --- 3. UI CONFIG & STYLING ---
+st.set_page_config(page_title="Strategic Meeting Intelligence", layout="wide")
+
+# High-End UX with Background Image
 st.markdown("""
     <style>
-    .stApp { background-color: #f8fafc; }
-    .report-card { 
-        padding: 24px; border-radius: 12px; background-color: white; 
-        border-left: 8px solid #1e40af; margin-bottom: 20px; 
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1517245318773-b7b83ca927a0?auto=format&fit=crop&q=80&w=2070");
+        background-size: cover;
     }
-    .metric-title { color: #1e40af; font-weight: 700; font-size: 1.2em; margin-bottom: 8px; }
-    .stTabs [data-baseweb="tab-list"] { gap: 12px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: white; border-radius: 6px; padding: 12px 28px; border: 1px solid #e2e8f0;
+    .glass-morphism {
+        background: rgba(255, 255, 255, 0.85);
+        padding: 30px; border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("💼 Enterprise Meeting Intelligence")
-st.markdown("Universal Audio & Video Synthesis • Strategic Insights • Deliverable Tracking")
-st.markdown("---")
-
-# --- 2. UNIVERSAL SEMANTIC LOGIC (Industry Neutral) ---
-def extract_strategic_outcomes(text):
-    """Semantic logic to identify future commitments and key decisions."""
-    lines = text.split('.')
-    deliverables = []
-    
-    intent_patterns = [
-        r"(i|we|team|everyone|dept|management)\s+(will|must|should|need to|tasked to|going to)",
-        r"(complete|finalize|integrate|develop|send|update|post|push|optimize|verify|check|design)",
-        r"(by|on|before|deadline|target|schedule)\s+(friday|monday|next week|tomorrow|end of day|[0-9]+)"
-    ]
-    
-    for line in lines:
-        clean_l = line.strip()
-        if len(clean_l) > 35:
-            match_score = sum(1 for p in intent_patterns if re.search(p, clean_l.lower()))
-            if match_score >= 1:
-                fillers = ["there are", "hello", "i am", "today is", "welcome", "we are a"]
-                if not any(f in clean_l.lower() for f in fillers):
-                    deliverables.append(clean_l)
-    return deliverables
-
-# --- 3. PRO MODEL ARCHITECTURE (Optimized & Stable) ---
+# --- 4. MODELS ---
 @st.cache_resource
-def load_enterprise_engine():
-    # Whisper handles video files natively by extracting the audio track
+def load_models():
     w_model = whisper.load_model("base")
-    
-    model_name = "sshleifer/distilbart-cnn-12-6"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    s_model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    
+    tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+    s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
     return w_model, tokenizer, s_model
 
-try:
-    w_model, tokenizer, s_model = load_enterprise_engine()
-except Exception as e:
-    st.error(f"Engine Initialization Error: {e}")
+w_model, tokenizer, s_model = load_models()
 
-# --- 4. INPUT SECTION (AUDIO & VIDEO) ---
-st.sidebar.header("📁 Input Source")
-uploaded_file = st.sidebar.file_uploader("Upload Meeting (Audio or Video)", 
-                                        type=["mp3", "wav", "m4a", "mp4", "mkv", "mov"])
-industry_context = st.sidebar.selectbox("Industry Domain", 
-                                        ["Technology", "Corporate Strategy", "Operations", "Sales & Marketing", "General Management"])
+# --- 5. APP TABS ---
+menu = ["🎙️ New Meeting", "📅 History & Edit", "💬 Meeting Chatbot"]
+choice = st.sidebar.selectbox("Navigation", menu)
 
-# --- 5. SYNTHESIS ENGINE ---
-if uploaded_file:
-    temp_path = f"temp_{uploaded_file.name}"
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-
-    # Professional Player Preview
-    if uploaded_file.type.startswith('video'):
-        st.subheader("📺 Video Content Preview")
-        st.video(uploaded_file)
-    else:
-        st.subheader("🔊 Audio Content Preview")
-        st.audio(uploaded_file)
-
-    if st.sidebar.button("🚀 Analyze & Generate Intelligence"):
-        with st.spinner("AI is synthesizing strategic data..."):
-            # A. Transcription
-            result = w_model.transcribe(temp_path)
-            raw_text = result["text"]
-
-            # B. Smart Outcome Extraction
-            outcomes = extract_strategic_outcomes(raw_text)
-            
-            # C. Executive Summarization (Addressing the Warnings)
-            inputs = tokenizer(f"Summarize key decisions in this {industry_context} meeting: " + raw_text[:2000], 
-                               return_tensors="pt", max_length=1024, truncation=True)
-            
-            summary_ids = s_model.generate(
-                inputs["input_ids"], 
-                max_length=150, 
-                min_length=60, 
-                length_penalty=2.0,
-                forced_bos_token_id=0  # FIXED: Warning for BART models resolved here
-            )
-            summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-
-            # --- 6. PRESENTATION LAYER ---
-            tab1, tab2, tab3 = st.tabs(["📄 Detailed Records", "📝 Executive Insights", "🎯 Strategic Deliverables"])
-
-            with tab1:
-                st.subheader("Comprehensive Meeting Record")
-                st.text_area("", raw_text, height=400)
-
-            with tab2:
-                st.subheader("Executive Briefing")
-                st.markdown(f"**Strategic Focus:** {industry_context}")
-                st.write(summary)
-                
-                report_text = f"EXECUTIVE SUMMARY ({industry_context})\n\nDECISIONS:\n{summary}\n\nSTRATEGIC DELIVERABLES:\n" + "\n".join([f"- {o}" for o in outcomes])
-                st.download_button("📥 Export Meeting Report", report_text, file_name="Executive_MoM.txt")
-
-            with tab3:
-                st.subheader("Key Outcomes & Accountability")
-                if outcomes:
-                    for i, outcome in enumerate(outcomes, 1):
-                        st.markdown(f'<div class="report-card"><div class="metric-title">Outcome {i}</div>{outcome}</div>', unsafe_allow_html=True)
-                else:
-                    st.warning("No high-intent deliverables identified.")
+# --- TAB 1: NEW MEETING ---
+if choice == "🎙️ New Meeting":
+    st.markdown('<div class="glass-morphism">', unsafe_allow_html=True)
+    st.title("💼 Enterprise Meeting Intelligence")
     
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
-else:
-    st.info("👈 Please upload a meeting recording (Audio or Video) to begin.")
+    audio_file = st.file_uploader("Upload Recording (Audio/Video)", type=["mp3", "wav", "mp4"])
+    meeting_title = st.text_input("Meeting Title", placeholder="e.g. Q1 Budget Planning")
+    
+    if audio_file and st.button("🚀 Analyze & Save"):
+        with st.spinner("Processing..."):
+            # Transcription & Date Detection
+            result = w_model.transcribe(audio_file.name)
+            raw_text = result["text"]
+            today = datetime.now().strftime("%Y-%m-%d")
+            
+            # Smart Logic for Actions (Regex based for dates/deadlines)
+            action_items = "\n".join(re.findall(r"([^.]*(?:will|need to|deadline|by|must)[^.]*\.)", raw_text, re.I))
+            
+            # Summary
+            inputs = tokenizer("summarize: " + raw_text[:2000], return_tensors="pt", max_length=1024, truncation=True)
+            summary_ids = s_model.generate(inputs["input_ids"], max_length=150, min_length=60, forced_bos_token_id=0)
+            summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            
+            # Save to Database
+            conn = sqlite3.connect('meetings.db')
+            c = conn.cursor()
+            c.execute("INSERT INTO meeting_history (date, title, summary, actions, transcript) VALUES (?,?,?,?,?)",
+                      (today, meeting_title, summary, action_items, raw_text))
+            conn.commit()
+            conn.close()
+            
+            st.success("Meeting Analyzed and Saved to Database!")
+            
+            # PDF Generation
+            pdf_file = create_pdf(meeting_title, summary, action_items, today)
+            with open(pdf_file, "rb") as f:
+                st.download_button("📥 Download Official PDF", f, file_name=pdf_file)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- TAB 2: HISTORY & EDIT ---
+elif choice == "📅 History & Edit":
+    st.title("📅 Meeting Archives")
+    conn = sqlite3.connect('meetings.db')
+    df = conn.execute("SELECT * FROM meeting_history").fetchall()
+    
+    for row in df:
+        with st.expander(f"{row[1]} | {row[2]}"):
+            new_summary = st.text_area("Edit Summary", row[3], key=f"sum_{row[0]}")
+            new_actions = st.text_area("Edit Actions", row[4], key=f"act_{row[0]}")
+            if st.button("Update Database", key=f"btn_{row[0]}"):
+                c = conn.cursor()
+                c.execute("UPDATE meeting_history SET summary=?, actions=? WHERE id=?", (new_summary, new_actions, row[0]))
+                conn.commit()
+                st.toast("Updated successfully!")
+    conn.close()
+
+# --- TAB 3: CHATBOT ---
+elif choice == "💬 Meeting Chatbot":
+    st.title("💬 Ask anything about your meetings")
+    conn = sqlite3.connect('meetings.db')
+    titles = [r[0] for r in conn.execute("SELECT title FROM meeting_history").fetchall()]
+    selected_meeting = st.selectbox("Select Meeting to Discuss", titles)
+    
+    user_ques = st.text_input("Ask a question (e.g., What was the final decision?)")
+    if user_ques:
+        transcript = conn.execute("SELECT transcript FROM meeting_history WHERE title=?", (selected_meeting,)).fetchone()[0]
+        # Simple Semantic Search (Logic: Find sentences containing user keywords)
+        relevant_info = [s for s in transcript.split('.') if any(w in s.lower() for w in user_ques.lower().split())]
+        st.info(f"AI Response: Based on the meeting, {' '.join(relevant_info[:2])}")
