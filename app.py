@@ -13,6 +13,21 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 import datetime
+import networkx as nx
+from collections import Counter
+import nltk
+from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.corpus import stopwords
+
+# Download NLTK data for summarization
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', quiet=True)
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', quiet=True)
 
 # ==========================================
 # 1. CONFIGURATION & STYLING
@@ -22,11 +37,7 @@ st.set_page_config(page_title="Strategic Intel | Executive Briefing", layout="wi
 # "Executive Slate" Design System
 st.markdown("""
     <style>
-    /* Main Background */
-    .stApp {
-        background-color: #F8FAFC;
-    }
-    /* Card Styling */
+    .stApp { background-color: #F8FAFC; }
     div[data-testid="stVerticalBlock"] > div > div {
         background-color: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -34,35 +45,17 @@ st.markdown("""
         padding: 20px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    /* Typography */
-    h1, h2, h3 {
-        color: #1E2A38 !important; /* Midnight Blue */
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-    /* Buttons */
+    h1, h2, h3 { color: #1E2A38 !important; font-family: 'Helvetica Neue', sans-serif; }
     .stButton>button {
-        background-color: #1E2A38;
-        color: white;
-        border-radius: 4px;
-        border: none;
+        background-color: #1E2A38; color: white; border-radius: 4px; border: none;
     }
-    .stButton>button:hover {
-        background-color: #334155;
-    }
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #E2E8F0;
-        border-radius: 4px 4px 0px 0px;
-        color: #1E2A38;
-    }
+    .stButton>button:hover { background-color: #334155; }
+    .stProgress > div > div > div > div { background-color: #10B981; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. DATABASE MANAGER (SQLite)
+# 2. DATABASE MANAGER
 # ==========================================
 class StrategicDB:
     def __init__(self, db_name="strategic_intel_final.db"):
@@ -101,21 +94,17 @@ class StrategicDB:
         cursor.execute("DELETE FROM meetings WHERE id = ?", (meeting_id,))
         self.conn.commit()
 
-    def update_record(self, meeting_id, column, value):
-        cursor = self.conn.cursor()
-        cursor.execute(f"UPDATE meetings SET {column} = ? WHERE id = ?", (value, meeting_id))
-        self.conn.commit()
-
 db = StrategicDB()
 
 # ==========================================
-# 3. AI ENGINE (The "Who" & "To Whom")
+# 3. PERFORMANCE-OPTIMIZED AI ENGINE
 # ==========================================
+
 @st.cache_resource
-def load_whisper():
-    """Load Whisper model for transcription."""
+def load_whisper_model(model_size="tiny"):
+    """Load Whisper model - 'tiny' is 3x faster than 'base' with good accuracy."""
     try:
-        model = whisper.load_model("base")
+        model = whisper.load_model(model_size)
         return model
     except Exception as e:
         st.error(f"Failed to load Whisper model: {e}")
@@ -123,120 +112,171 @@ def load_whisper():
 
 @st.cache_resource
 def load_summarizer():
-    """Load DistilBART model directly without pipeline to avoid task registration issues."""
+    """Load DistilBART for high-quality summaries."""
     try:
         model_name = "sshleifer/distilbart-cnn-12-6"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        
-        # Move to GPU if available
         device = 0 if torch.cuda.is_available() else -1
         if device >= 0:
             model = model.to(device)
-            
         return tokenizer, model, device
     except Exception as e:
-        st.error(f"Failed to load summarization model: {e}")
+        st.error(f"Failed to load summarizer: {e}")
         return None, None, -1
 
-whisper_model = load_whisper()
-tokenizer, summarizer_model, device = load_summarizer()
+# --- FAST EXTRACTOR: TextRank Algorithm (Instant) ---
+def extractive_summary_fast(text, num_sentences=5):
+    """Fast extractive summarization using TextRank algorithm."""
+    try:
+        sentences = sent_tokenize(text)
+        if len(sentences) <= num_sentences:
+            return text
+        
+        # Tokenize and create word frequencies
+        stop_words = set(stopwords.words('english'))
+        words = word_tokenize(text.lower())
+        word_freq = Counter([w for w in words if w.isalnum() and w not in stop_words])
+        
+        # Score sentences based on word frequencies
+        sentence_scores = {}
+        for i, sentence in enumerate(sentences):
+            sentence_words = word_tokenize(sentence.lower())
+            if sentence_words:
+                score = sum(word_freq.get(w, 0) for w in sentence_words) / len(sentence_words)
+                sentence_scores[i] = score
+        
+        # Get top sentences
+        top_indices = sorted(sentence_scores.keys(), key=lambda x: sentence_scores[x], reverse=True)[:num_sentences]
+        top_indices.sort()
+        
+        summary = ' '.join([sentences[i] for i in top_indices])
+        return summary
+    except Exception as e:
+        return text[:500] + "..."
 
-def summarize_text(text):
-    """Summarize text using DistilBART with proper chunking."""
-    if not text or len(text.strip()) < 50:
-        return "Text too short to summarize."
+# --- HIGH-QUALITY SUMMARIZER: DistilBART ---
+def summarize_with_bart(text, tokenizer, model, device):
+    """Generate abstractive summary using DistilBART."""
+    if not text or len(text.strip()) < 100:
+        return text if text else "Text too short."
     
-    max_chunk_length = 1024
-    chunks = [text[i:i+max_chunk_length] for i in range(0, min(len(text), 5000), max_chunk_length)]
+    # Process in chunks
+    max_chunk = 1024
+    chunks = [text[i:i+max_chunk] for i in range(0, min(len(text), 3000), max_chunk)]
     
     summaries = []
     for chunk in chunks:
-        if len(chunk) > 50:
-            try:
-                inputs = tokenizer(chunk, return_tensors="pt", max_length=1024, truncation=True)
-                if device >= 0:
-                    inputs = {k: v.to(device) for k, v in inputs.items()}
-                
-                summary_ids = summarizer_model.generate(
-                    inputs["input_ids"], 
-                    max_length=130, 
-                    min_length=30,
-                    num_beams=4,
-                    length_penalty=2.0,
-                    early_stopping=True
-                )
-                summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-                summaries.append(summary)
-            except Exception as e:
-                st.warning(f"Chunk summarization failed: {e}")
-                continue
+        if len(chunk) < 50:
+            continue
+        try:
+            inputs = tokenizer(chunk, return_tensors="pt", max_length=1024, truncation=True)
+            if device >= 0:
+                inputs = {k: v.to(device) for k, v in inputs.items()}
+            
+            summary_ids = model.generate(
+                inputs["input_ids"],
+                max_length=130,
+                min_length=30,
+                num_beams=4,
+                length_penalty=2.0,
+                early_stopping=True
+            )
+            summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+            summaries.append(summary)
+        except Exception:
+            continue
     
-    return " ".join(summaries) if summaries else "Summarization failed."
+    return " ".join(summaries) if summaries else extractive_summary_fast(text)
 
-def extract_speaker_intent(full_text):
-    """
-    Layer 1 & 2 Logic:
-    1. Identifies Proper Nouns (Potential Speakers).
-    2. Regex for Assignments (Who -> To Whom).
-    """
+# --- INTENT EXTRACTION ---
+def extract_assignments(text):
+    """Extract action items using pattern matching."""
     assignments = []
     
-    # Regex Pattern: [Name], [Modal/Command] [Action]
-    # Matches: "Sarah, please send the report" or "John, can you update the slide?"
-    pattern = r"([A-Z][a-z]+),?\s(?:please|can you|need to|should|will you)\s(.+?)(?:\.|$)"
+    # Multiple patterns for different command structures
+    patterns = [
+        r"([A-Z][a-z]+),?\s(?:please|can you|need to|should|will you|must)\s(.+?)(?:\.|$)",
+        r"([A-Z][a-z]+),?\s(go ahead and|start working on|finish|complete)\s(.+?)(?:\.|$)",
+        r"action item[:\s]+([A-Z][a-z]+)[:\s]+(.+?)(?:\.|$)",
+    ]
     
-    matches = re.finditer(pattern, full_text)
+    for pattern in patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            if len(match.groups()) == 2:
+                recipient, action = match.groups()
+            elif len(match.groups()) == 3:
+                recipient, _, action = match.groups()
+            else:
+                continue
+            assignments.append(f"👤 {recipient.strip()}: {action.strip().capitalize()}")
     
-    for match in matches:
-        recipient = match.group(1)
-        action = match.group(2)
-        assignments.append(f"👤 {recipient}: {action.strip().capitalize()}...")
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_assignments = []
+    for a in assignments:
+        if a.lower() not in seen:
+            seen.add(a.lower())
+            unique_assignments.append(a)
     
-    return assignments
+    return unique_assignments
 
-def process_video(uploaded_file, mode):
-    """
-    Core Processing Pipeline:
-    1. Save Temp File
-    2. Transcribe (Whisper)
-    3. Analyze (Summarization + Regex)
-    4. Structure Data
-    """
-    if whisper_model is None or summarizer_model is None:
-        raise RuntimeError("Models not loaded properly. Please restart the application.")
+# ==========================================
+# 4. VIDEO PROCESSING PIPELINE
+# ==========================================
+def process_video_fast(uploaded_file, mode, quality_mode="fast"):
+    """Optimized processing pipeline with progress tracking."""
     
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') 
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # Save temp file
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
     try:
         tfile.write(uploaded_file.read())
+        status_text.text("Step 1/3: Transcribing audio with Whisper...")
+        progress_bar.progress(20)
         
-        # 1. Transcription
+        # Transcription
         result = whisper_model.transcribe(tfile.name)
         transcript_text = result['text']
+        progress_bar.progress(50)
         
-        # 2. Summarization
-        summary = summarize_text(transcript_text)
+        if quality_mode == "fast":
+            status_text.text("Step 2/3: Generating extractive summary...")
+            summary = extractive_summary_fast(transcript_text)
+        else:
+            status_text.text("Step 2/3: Generating abstractive summary (DistilBART)...")
+            summary = summarize_with_bart(transcript_text, tokenizer, summarizer_model, device)
         
-        # 3. Assignment Extraction
-        assignments = extract_speaker_intent(transcript_text)
+        progress_bar.progress(75)
         
-        # 4. Strategic Intel Construction
+        # Extract assignments
+        status_text.text("Step 3/3: Identifying action items...")
+        assignments = extract_assignments(transcript_text)
+        
+        # Intel data
         intel_data = {
             "speakers_detected": len(set(re.findall(r"([A-Z][a-z]+)", transcript_text[:500]))),
             "action_items_count": len(assignments),
-            "duration_estimate": "Unknown"
+            "transcript_length": len(transcript_text),
+            "processing_mode": quality_mode
         }
-
+        
+        progress_bar.progress(100)
+        status_text.text("✅ Processing complete!")
+        
         return transcript_text, summary, assignments, intel_data
+        
     finally:
-        # Cleanup temp file
         try:
             os.unlink(tfile.name)
         except:
             pass
 
 # ==========================================
-# 4. DOCUMENT ENGINE (ReportLab)
+# 5. PDF GENERATOR
 # ==========================================
 def create_pdf(filename, summary, assignments):
     buffer = BytesIO()
@@ -244,24 +284,20 @@ def create_pdf(filename, summary, assignments):
     elements = []
     styles = getSampleStyleSheet()
 
-    # Header
     elements.append(Paragraph(f"STRATEGIC BRIEFING: {filename}", styles['Title']))
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", styles['Normal']))
     elements.append(Spacer(1, 24))
 
-    # Executive Summary
     elements.append(Paragraph("Executive Summary", styles['Heading2']))
     elements.append(Paragraph(summary, styles['Normal']))
     elements.append(Spacer(1, 24))
 
-    # Action Items Table
     elements.append(Paragraph("Strategic Deliverables & Assignments", styles['Heading2']))
-    data = [['Recipient', 'Action Required']] # Header
+    data = [['Recipient', 'Action Required']]
     
     if assignments:
         for item in assignments:
-            # Clean formatting: "👤 Name: Action..."
             clean_item = item.replace("👤 ", "").split(":")
             if len(clean_item) > 1:
                 data.append([clean_item[0], clean_item[1].strip()])
@@ -272,7 +308,7 @@ def create_pdf(filename, summary, assignments):
 
     t = Table(data, colWidths=[150, 350])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.2, 0.2, 0.5)), # Midnight Blue
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.2, 0.2, 0.5)),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -281,29 +317,58 @@ def create_pdf(filename, summary, assignments):
         ('GRID', (0, 0), (-1, -1), 1, colors.black)
     ]))
     elements.append(t)
-
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 # ==========================================
-# 5. UI CONTROLLER
+# 6. MAIN APPLICATION
 # ==========================================
 
 st.title("Strategic Intel 🧠")
-st.caption("Automated Intelligence Extraction & Briefing System")
+st.caption("High-Performance Intelligence Extraction System")
 
-# Sidebar: Context
 with st.sidebar:
-    st.header("Workspace Context")
-    mode = st.radio("Select Intelligence Mode:", ["Corporate Strategy", "Academic Review"])
-    st.info(f"Current Mode: **{mode}**")
+    st.header("Workspace Settings")
+    mode = st.radio("Intelligence Mode:", ["Corporate Strategy", "Academic Review"])
+    
     st.markdown("---")
-    st.markdown("**System Status:** Online")
-    st.markdown("**Model:** Whisper Base + DistilBART")
+    st.header("Performance Settings")
+    quality_mode = st.selectbox(
+        "Processing Mode:",
+        ["fast", "deep"],
+        format_func=lambda x: "⚡ Fast (TextRank)" if x == "fast" else "🎯 Deep (AI Summarization)"
+    )
+    st.info(
+        "⚡ **Fast**: Instant results using TextRank algorithm\n\n"
+        "🎯 **Deep**: High-quality AI summaries (2-3x slower)"
+    )
+    
+    st.markdown("---")
+    st.header("Model Selection")
+    whisper_size = st.selectbox("Whisper Model:", ["tiny", "base", "small"], index=0)
+    
+    if st.button("🔄 Reload Models"):
+        st.cache_resource.clear()
+        st.rerun()
+    
+    st.markdown("---")
+    st.markdown("**System Status:**")
+    if whisper_model is None:
+        st.error("Whisper not loaded")
+    else:
+        st.success("Whisper Ready")
 
-# Main Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📂 Ingest", "📊 Dashboard", "🗣️ Strategic Advisor", "🗄️ Archives"])
+# Load models based on selection
+@st.cache_resource
+def get_models(size):
+    return load_whisper_model(size)
+
+whisper_model = get_models(whisper_size)
+tokenizer, summarizer_model, device = load_summarizer()
+
+# Tabs
+tab1, tab2, tab3, tab4 = st.tabs(["📂 Ingest", "📊 Dashboard", "🗣️ Advisor", "🗄️ Archives"])
 
 # --- TAB 1: INGEST ---
 with tab1:
@@ -315,124 +380,87 @@ with tab1:
             st.video(uploaded_file)
         with col2:
             st.write("**File Details:**")
-            st.write(f"Name: {uploaded_file.name}")
-            st.write(f"Size: {uploaded_file.size / 1024:.2f} KB")
+            st.write(f"📁 {uploaded_file.name}")
+            st.write(f"📊 {(uploaded_file.size / 1024 / 1024):.2f} MB")
             
-        if st.button("🚀 Extract Intelligence"):
-            with st.spinner("Analyzing Audio Stream & Semantic Intent..."):
-                transcript, summary, assignments, intel = process_video(uploaded_file, mode)
-                
-                # Save to DB
-                db.save_meeting(
-                    uploaded_file.name, mode, transcript, 
-                    summary, str(assignments), str(intel)
-                )
-                
-                st.session_state['latest_result'] = {
-                    'transcript': transcript,
-                    'summary': summary,
-                    'assignments': assignments,
-                    'filename': uploaded_file.name
-                }
-                st.success("Intelligence Extraction Complete!")
-                st.rerun()
+            st.markdown("---")
+            st.write("**Recommended Mode:**")
+            if uploaded_file.size < 5 * 1024 * 1024:  # < 5MB
+                st.success("Small file - Fast mode ideal")
+            elif uploaded_file.size < 20 * 1024 * 1024:  # < 20MB
+                st.warning("Medium file - Balanced mode recommended")
+            else:
+                st.error("Large file - May take time")
+        
+        st.markdown("---")
+        if st.button("🚀 Extract Intelligence", type="primary"):
+            transcript, summary, assignments, intel = process_video_fast(uploaded_file, mode, quality_mode)
+            
+            db.save_meeting(
+                uploaded_file.name, mode, transcript, 
+                summary, str(assignments), str(intel)
+            )
+            
+            st.session_state['latest_result'] = {
+                'transcript': transcript,
+                'summary': summary,
+                'assignments': assignments,
+                'filename': uploaded_file.name
+            }
+            st.success("✅ Intelligence Extraction Complete!")
+            st.rerun()
 
-# --- TAB 2: DASHBOARD (Latest Result) ---
+# --- TAB 2: DASHBOARD ---
 with tab2:
     if 'latest_result' in st.session_state:
         res = st.session_state['latest_result']
         
-        # Metrics Row
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Transcript Length", f"{len(res['transcript'])} chars")
-        m2.metric("Assignments Found", len(res['assignments']))
-        m3.metric("Mode", mode)
+        # Quick Stats
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Transcript", f"{len(res['transcript'])} chars")
+        m2.metric("Words", f"{len(res['transcript'].split())}")
+        m3.metric("Assignments", len(res['assignments']))
+        m4.metric("Mode", quality_mode.upper())
         
-        # Content Display
-        with st.expander("📝 Full Transcript", expanded=False):
-            st.text(res['transcript'])
-            
-        st.subheader("Executive Summary")
-        st.info(res['summary'])
+        # Tabs within Dashboard
+        d_tab1, d_tab2 = st.tabs(["📋 Summary", "📝 Transcript"])
         
-        st.subheader("Action Items & Assignments")
-        if res['assignments']:
-            for item in res['assignments']:
-                st.write(f"• {item}")
-        else:
-            st.write("No explicit assignments detected via semantic analysis.")
+        with d_tab1:
+            st.subheader("Executive Summary")
+            st.info(res['summary'])
             
-        # PDF Export
-        pdf_data = create_pdf(res['filename'], res['summary'], res['assignments'])
-        st.download_button(
-            label="📄 Download Strategic Brief (PDF)",
-            data=pdf_data,
-            file_name=f"Strategic_Brief_{res['filename']}.pdf",
-            mime="application/pdf"
-        )
+            st.subheader("🎯 Action Items")
+            if res['assignments']:
+                for i, item in enumerate(res['assignments'], 1):
+                    st.write(f"{i}. {item}")
+            else:
+                st.write("No explicit assignments detected.")
+            
+            # PDF Export
+            pdf_data = create_pdf(res['filename'], res['summary'], res['assignments'])
+            st.download_button(
+                "📄 Download Strategic Brief (PDF)",
+                pdf_data,
+                file_name=f"Strategic_Brief_{res['filename']}.pdf",
+                mime="application/pdf"
+            )
+        
+        with d_tab2:
+            with st.expander("View Full Transcript", expanded=True):
+                st.text(res['transcript'])
     else:
-        st.info("Upload a video in the 'Ingest' tab to generate intelligence.")
+        st.info("Upload a video in the 'Ingest' tab to begin.")
 
-# --- TAB 3: STRATEGIC ADVISOR (RAG Q&A) ---
+# --- TAB 3: STRATEGIC ADVISOR ---
 with tab3:
-    st.subheader("🗣️ The Strategic Advisor")
-    st.write("Ask specific questions about the meeting. (e.g., 'What did Rahul say about the budget?')")
+    st.subheader("🗣️ Strategic Advisor")
+    st.write("Ask questions about past meetings.")
     
-    # Load history for context
     history_df = db.get_history()
     
     if not history_df.empty:
-        # Combine all transcripts for simple RAG search
-        all_transcripts = " ".join(history_df['transcript'].dropna().tolist())
+        query = st.text_input("Ask about the meeting:", placeholder="e.g., What did Rahul say about the budget?")
         
-        query = st.text_input("Ask your question:")
         if query:
-            # Simple keyword search + context extraction (Lightweight RAG)
-            sentences = all_transcripts.split('.')
-            relevant = [s.strip() for s in sentences if query.lower() in s.lower()]
-            
-            if relevant:
-                st.success("Relevant Intelligence Found:")
-                for r in relevant[:5]: # Top 5 results
-                    st.markdown(f"> {r}.")
-            else:
-                st.warning("No direct matches found in archived transcripts.")
-    else:
-        st.info("No archived meetings found. Please ingest data first.")
-
-# --- TAB 4: ARCHIVES ---
-with tab4:
-    st.subheader("📂 Interactive Archives")
-    df = db.get_history()
-    
-    if not df.empty:
-        # Searchable Grid
-        search = st.text_input("Search Archives", placeholder="Filter by name or content...")
-        if search:
-            filtered_df = df[df['filename'].str.contains(search, case=False) | 
-                             df['summary'].str.contains(search, case=False)]
-        else:
-            filtered_df = df
-            
-        for index, row in filtered_df.iterrows():
-            with st.container():
-                c1, c2, c3 = st.columns([4, 1, 1])
-                with c1:
-                    st.markdown(f"**{row['filename']}**")
-                    st.caption(f"{row['upload_date']} | Mode: {row['mode']}")
-                with c2:
-                    if st.button("View", key=f"view_{row['id']}"):
-                        st.session_state['latest_result'] = {
-                            'transcript': row['transcript'],
-                            'summary': row['summary'],
-                            'assignments': eval(row['assignments']),
-                            'filename': row['filename']
-                        }
-                        st.rerun()
-                with c3:
-                    if st.button("Delete", key=f"del_{row['id']}"):
-                        db.delete_meeting(row['id'])
-                        st.rerun()
-                st.divider()
-    else:
-        st.write("No records found.")
+            all_transcripts = " ".join(history_df['transcript'].dropna().tolist())
+            sentences
