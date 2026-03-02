@@ -101,13 +101,13 @@ def transcribe_long_audio(file_path):
 
 # --- 5. NAVIGATION ---
 with st.sidebar:
-    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC INTEL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC MINUTES</h2>", unsafe_allow_html=True)
     st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Technical Sync"])
     st.markdown("---")
     choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
     st.markdown("---")
-    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'>v8.0 Professional Edition</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; opacity:0.8; font-size:12px;'></div>", unsafe_allow_html=True)
 
 # --- TAB 1: INTELLIGENCE SUITE ---
 if choice == "🚀 Meeting Summary":
@@ -128,7 +128,7 @@ if choice == "🚀 Meeting Summary":
     file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "mp4", "m4a", "mov"], label_visibility="collapsed")
     title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Planning")
     
-    if file and st.button("Generate Intelligence Summary", type="primary", use_container_width=True):
+    if file and st.button("Generate Meeting Summary", type="primary", use_container_width=True):
         if not title:
             st.warning("Please specify a session title.")
         else:
@@ -206,3 +206,4 @@ elif choice == "📅 Meeting Archives":
                 if st.button("Delete", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
+
