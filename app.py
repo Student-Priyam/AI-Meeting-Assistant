@@ -15,7 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 def init_db():
     conn = sqlite3.connect('strategic_intel_master.db')
     c = conn.cursor()
-    # Schema supports meeting types for categorized archives
+    # Supports meeting types for categorized archives
     c.execute('''CREATE TABLE IF NOT EXISTS archives 
                  (id INTEGER PRIMARY KEY, date TEXT, title TEXT, type TEXT, summary TEXT, actions TEXT, transcript TEXT)''')
     conn.commit()
@@ -173,7 +173,7 @@ elif choice == "📅 Records Archive":
             st.markdown('<div class="executive-card">', unsafe_allow_html=True)
             c1, c2, c3 = st.columns([4, 1.5, 0.5])
             with c1:
-                b_class = "badge-edu" if "Academic" in row[3] else "badge-corp"
+                b_class = "badge-edu" if "Academic" in str(row[3]) else "badge-corp"
                 st.markdown(f"### {row[2]} <span class='badge {b_class}'>{row[3]}</span>", unsafe_allow_html=True)
                 st.caption(f"📅 Recorded: {row[1]}")
             with c2:
@@ -208,7 +208,8 @@ elif choice == "💬 Strategic Advisor":
         if query:
             context = recs[sel_m]
             # Pinpoint sentence retrieval
-            matches = [s.strip() for s in context.split('.') if any(w.lower() in s.lower() for w in query.split())]
+            sentences = context.split('.')
+            matches = [s.strip() for s in sentences if any(w.lower() in s.lower() for w in query.split())]
             
             st.markdown('<div class="ai-bubble">', unsafe_allow_html=True)
             if matches:
