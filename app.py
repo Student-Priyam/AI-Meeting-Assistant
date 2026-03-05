@@ -8,7 +8,7 @@ except ImportError:
 
 import streamlit as st
 import whisper
-import google.generativeai as genai  # ADDED FOR CHATBOT
+import google.generativeai as genai  # FOR CHATBOT
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import re
 import os
@@ -39,11 +39,12 @@ def delete_record(record_id):
 init_db()
 
 # --- 2.1 AI CONFIGURATION (FOR CHATBOT) ---
+# Ensure "GEMINI_API_KEY" is added in Streamlit Cloud Secrets
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("API Key missing! Add 'GEMINI_API_KEY' in Streamlit Secrets.")
+    st.error("⚠️ API Key missing! Go to Settings > Secrets and add GEMINI_API_KEY.")
 
 # --- 3. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Assistant", layout="wide", page_icon="💼")
@@ -88,6 +89,7 @@ def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
     
+    # 5-minute chunks
     chunk_length = 5 * 60 * 1000 
     chunks = [audio[i:i + chunk_length] for i in range(0, len(audio), chunk_length)]
     
@@ -146,11 +148,11 @@ if choice == "🚀 Meeting Summary":
 
                 st.session_state['current_transcript'] = raw_text
                 
-                # Context-aware extraction
+                # Action items extraction
                 p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
-                # Summarization
+                # Summarization (BART)
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:3500], return_tensors="pt", max_length=1024, truncation=True)
@@ -168,10 +170,11 @@ if choice == "🚀 Meeting Summary":
                 st.session_state['actions'] = actions
                 st.session_state['ts'] = ts
                 st.session_state['active_mode'] = m_type
-                st.session_state['title'] = title
+                st.session_state['title_saved'] = title
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- RESULTS SECTION ---
     if 'summary' in st.session_state:
         st.divider()
         st.markdown(f"### 🎯 Strategic Insights: {st.session_state.get('active_mode', m_type)}")
@@ -197,39 +200,51 @@ if choice == "🚀 Meeting Summary":
             </div>
             """, unsafe_allow_html=True)
 
-        # --- CHATBOT SECTION ADDED HERE ---
-        st.markdown("### 🤖 Ask Anything About This Session")
+        # --- SMART CHATBOT SECTION ---
+        st.markdown("---")
+        st.markdown("### 🤖 Chat with AI Assistant")
+        st.caption("Aap is meeting ke context mein koi bhi sawal puch sakte hain.")
+
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        chat_container = st.container(height=300)
+        # Chat display container
+        chat_container = st.container(height=350)
         with chat_container:
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        if prompt := st.chat_input("What was discussed about..."):
+        if prompt := st.chat_input("Ask about this session..."):
             st.session_state.messages.append({"role": "user", "content": prompt})
             with chat_container:
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 
                 with st.chat_message("assistant"):
-                    context = f"Transcript: {st.session_state['current_transcript']}\n\nQuestion: {prompt}"
+                    # Context prompt for high accuracy
+                    context_query = f"""
+                    Transcript: {st.session_state['current_transcript']}
+                    
+                    User Question: {prompt}
+                    
+                    Instruction: Answer strictly based on the transcript provided. If you cannot find the answer, say you don't know.
+                    """
                     try:
-                        response = gemini_model.generate_content(f"Answer strictly based on this transcript: {context}")
+                        response = gemini_model.generate_content(context_query)
                         st.markdown(response.text)
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except:
-                        st.error("AI Assistant is currently offline.")
+                    except Exception as e:
+                        # DEBUG: Ye line aapko batayegi ki problem kya hai
+                        st.error(f"AI Error: {e}")
 
-        # --- TEXT FILE DOWNLOAD LOGIC ---
+        # --- DOWNLOAD REPORT ---
         st.divider()
-        report_content = f"STRATEGIC INTELLIGENCE REPORT\nTITLE: {st.session_state.get('title')}\n..."
+        report_content = f"STRATEGIC INTELLIGENCE REPORT\nTITLE: {st.session_state.get('title_saved')}\nDATE: {st.session_state['ts']}\n\nSUMMARY:\n{st.session_state['summary']}\n\nTRANSCRIPT:\n{st.session_state['current_transcript']}"
         st.download_button(
-            label="📥 Download Intelligence Report (.txt)",
+            label="📥 Download Full Report (.txt)",
             data=report_content,
-            file_name=f"Strategic_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            file_name=f"Report_{st.session_state.get('title_saved')}.txt",
             mime="text/plain",
             use_container_width=True
         )
@@ -239,12 +254,14 @@ elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding: 2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
-    if not data: st.info("Historical archives are currently empty.")
+    if not data: 
+        st.info("Historical archives are currently empty.")
     else:
         for row in data:
             with st.expander(f"📅 {row[1]} | {row[2]} ({row[3]})"):
                 st.write(f"**Summary:** {row[4]}")
                 st.write(f"**Action Items:** {row[5]}")
                 if st.button("Delete", key=f"d_{row[0]}"): 
-                    delete_record(row[0]); st.rerun()
+                    delete_record(row[0])
+                    st.rerun()
     conn.close()
