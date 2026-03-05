@@ -34,34 +34,26 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2.1 STABLE AI LOGIC (FIX FOR 410 ERROR) ---
+# --- 2.1 STABLE AI LOGIC (FIXED FOR 410 ERROR) ---
 def ask_ai_assistant(transcript, user_query):
     if "HF_TOKEN" not in st.secrets:
         return "Error: HF_TOKEN missing in Streamlit Secrets."
     
     api_key = st.secrets["HF_TOKEN"]
-    # Updated to a more stable high-traffic model endpoint
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+    # UPDATED: Using the latest stable router URL and Mistral v0.3
+    API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3"
     
     headers = {"Authorization": f"Bearer {api_key}"}
-    # Optimized prompt format for Mistral v0.3
-    prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer based ONLY on the context: [/INST]</s>"
-    
-    payload = {
-        "inputs": prompt, 
-        "parameters": {"max_new_tokens": 150, "return_full_text": False},
-        "options": {"wait_for_model": True} # Critical to handle loading states
-    }
+    prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer briefly: [/INST]</s>"
+    payload = {"inputs": prompt, "parameters": {"max_new_tokens": 150, "return_full_text": False}}
     
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=25)
         if response.status_code == 200:
             result = response.json()
             return result[0]['generated_text'].strip()
-        elif response.status_code == 503:
-            return "AI model is currently waking up on Hugging Face. Please retry in 15 seconds."
         else:
-            return f"AI Error {response.status_code}: Please check if your HF_TOKEN has 'Inference' permissions."
+            return f"AI Error {response.status_code}: Please check your HF_TOKEN permissions in Settings."
     except Exception as e:
         return f"Connection failed: {str(e)}"
 
@@ -82,10 +74,14 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
     }
     .hero-banner h1 { font-size: 2.8rem; font-weight: 700; color: white !important; }
+    .executive-card {
+        background: white; padding: 2.5rem; border-radius: 12px; border: 1px solid #E2E8F0; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. AUDIO PROCESSING (Whisper) ---
+# --- 4. AUDIO PROCESSING (WHISPER) ---
 def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
@@ -121,15 +117,15 @@ if choice == "🚀 Meeting Summary":
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="executive-card" style="background:white; padding:2.5rem; border-radius:12px; border:1px solid #E2E8F0;">', unsafe_allow_html=True)
+    st.markdown('<div class="executive-card">', unsafe_allow_html=True)
     file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "mp4", "m4a", "mov"], label_visibility="collapsed")
-    title = st.text_input("Session Title", placeholder="e.g., Project Sync")
+    title = st.text_input("Session Title", placeholder="e.g., Roadmap Planning")
     
     if file and st.button("Generate Intelligence Report", type="primary", use_container_width=True):
         if not title:
             st.warning("Please specify a session title.")
         else:
-            with st.spinner("Decoding Meeting Content..."):
+            with st.spinner("Decoding Meeting Context..."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                     tmp.write(file.getvalue())
                     raw_text = transcribe_long_audio(tmp.name)
@@ -164,7 +160,7 @@ if choice == "🚀 Meeting Summary":
                 <p style="color: #1E3A8A;">{st.session_state['summary']}</p></div>""", unsafe_allow_html=True)
 
         with col2:
-            act_text = st.session_state.get('actions', 'No specific actions detected.').replace('•', '<br>•')
+            act_text = st.session_state.get('actions', 'No actions detected.').replace('•', '<br>•')
             st.markdown(f"""<div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; min-height: 250px;">
                 <h4 style="color: #166534; margin-top: 0;">🚀 Key Deliverables</h4>
                 <div style="color: #14532D;">{act_text}</div></div>""", unsafe_allow_html=True)
@@ -179,7 +175,7 @@ if choice == "🚀 Meeting Summary":
             for m in st.session_state.messages:
                 with st.chat_message(m["role"]): st.markdown(m["content"])
 
-        if p := st.chat_input("Ask about the meeting details..."):
+        if p := st.chat_input("Ask about the meeting..."):
             st.session_state.messages.append({"role": "user", "content": p})
             with chat_container:
                 with st.chat_message("user"): st.markdown(p)
@@ -191,4 +187,3 @@ if choice == "🚀 Meeting Summary":
 # --- ARCHIVES ---
 elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding:2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
-    # Database logic remains same
