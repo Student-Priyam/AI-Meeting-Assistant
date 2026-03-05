@@ -44,14 +44,15 @@ def ask_gemini_direct(transcript, user_query):
         return "Error: API Key missing in Secrets."
     
     api_key = st.secrets["GEMINI_API_KEY"]
-    # Direct endpoint to bypass library 404 issues
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    # CHANGED: v1beta to v1 AND models/gemini-1.5-flash to gemini-1.5-flash
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
             "parts": [{
-                "text": f"You are a meeting assistant. Use this transcript to answer strictly: {transcript}\n\nQuestion: {user_query}"
+                "text": f"Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer strictly based on the context."
             }]
         }]
     }
@@ -61,6 +62,7 @@ def ask_gemini_direct(transcript, user_query):
         if response.status_code == 200:
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         else:
+            # Agar ab bhi error aaye toh ye exact error message dikhayega
             return f"AI Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Connection failed: {str(e)}"
@@ -232,3 +234,4 @@ elif choice == "📅 Meeting Archives":
                 if st.button("Delete", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
+
