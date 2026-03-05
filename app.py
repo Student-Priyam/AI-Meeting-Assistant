@@ -42,7 +42,6 @@ def ask_ai_assistant(transcript, user_query):
     API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
     headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
     
-    # Prompt engineering for clean answers
     prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer briefly based on context: [/INST]</s>"
     payload = {"inputs": prompt, "parameters": {"max_new_tokens": 150, "return_full_text": False}}
     
@@ -111,8 +110,8 @@ if choice == "🚀 Meeting Summary":
             <img src="https://images.unsplash.com/photo-1616531770192-6eaea74c2456?auto=format&fit=crop&q=60&w=1200" 
                  style="border-radius:12px; max-width:600px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
         </div>
-        <h1>Missed a meeting? No need to rewatch it.</h1>
-        <h2>{m_type} Intelligence Mode</h2>
+        <h1>Strategic Intelligence Assistant</h1>
+        <h2>{m_type} Mode Active</h2>
     </div>
     """, unsafe_allow_html=True)
 
@@ -121,34 +120,43 @@ if choice == "🚀 Meeting Summary":
     title = st.text_input("Session Title", placeholder="e.g., Q1 Roadmap Planning")
     
     if file and st.button("Generate Intelligence Report", type="primary", use_container_width=True):
-        with st.spinner("Decoding Meeting..."):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
-                tmp.write(file.getvalue())
-                raw_text = transcribe_long_audio(tmp.name)
-            
-            # Action items extraction
-            p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
-            actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
+        if not title:
+            st.warning("Please specify a session title.")
+        else:
+            with st.spinner("Decoding Meeting Context..."):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
+                    tmp.write(file.getvalue())
+                    raw_text = transcribe_long_audio(tmp.name)
+                
+                # Action items extraction
+                p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
+                actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
-            # Summarization (BART)
-            tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
-            s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
-            inputs = tokenizer("summarize: " + raw_text[:3000], return_tensors="pt", max_length=1024, truncation=True)
-            sum_ids = s_model.generate(inputs["input_ids"], max_length=150)
-            summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
+                # Summarization (BART)
+                tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
+                s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
+                inputs = tokenizer("summarize: " + raw_text[:3000], return_tensors="pt", max_length=1024, truncation=True)
+                sum_ids = s_model.generate(inputs["input_ids"], max_length=150)
+                summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
-            ts = datetime.now().strftime("%d-%m-%Y %H:%M")
-            conn = sqlite3.connect('strategic_intel_v8.db')
-            conn.execute("INSERT INTO archives (date, title, type, summary, actions, transcript) VALUES (?,?,?,?,?,?)",
-                         (ts, title, m_type, summary, actions, raw_text))
-            conn.commit()
-            conn.close()
+                ts = datetime.now().strftime("%d-%m-%Y %H:%M")
+                conn = sqlite3.connect('strategic_intel_v8.db')
+                conn.execute("INSERT INTO archives (date, title, type, summary, actions, transcript) VALUES (?,?,?,?,?,?)",
+                             (ts, title, m_type, summary, actions, raw_text))
+                conn.commit()
+                conn.close()
 
-            st.session_state.update({'summary': summary, 'actions': actions, 'current_transcript': raw_text, 'title_saved': title})
-            st.rerun()
+                # CRITICAL: Saving 'actions' to session_state
+                st.session_state.update({
+                    'summary': summary, 
+                    'actions': actions, 
+                    'current_transcript': raw_text, 
+                    'title_saved': title
+                })
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- RESULTS DISPLAY ---
+    # --- RESULTS DISPLAY (Fixed Side-by-Side Cards) ---
     if 'summary' in st.session_state:
         st.divider()
         st.markdown(f"### 🎯 Session Insights")
@@ -156,19 +164,22 @@ if choice == "🚀 Meeting Summary":
         col1, col2 = st.columns([1, 1])
         with col1:
             st.markdown(f"""
-            <div style="background-color: #EBF5FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; height: 100%;">
+            <div style="background-color: #EBF5FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; min-height: 250px;">
                 <h4 style="color: #1E40AF; margin-top: 0;">📝 Executive Summary</h4>
                 <p style="color: #1E3A8A; line-height: 1.6;">{st.session_state['summary']}</p>
             </div>
             """, unsafe_allow_html=True)
 
         with col2:
-            clean_actions = st.session_state['actions'].replace('•', '<br>•')
+            # Fixed KeyError: Safe check for 'actions'
+            raw_actions = st.session_state.get('actions', 'No specific actions detected.')
+            clean_actions = raw_actions.replace('•', '<br>•')
+            
             st.markdown(f"""
-            <div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; height: 100%;">
+            <div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; min-height: 250px;">
                 <h4 style="color: #166534; margin-top: 0;">🚀 Key Deliverables</h4>
                 <div style="color: #14532D; line-height: 1.5;">
-                    {clean_actions if clean_actions else "No specific actions detected."}
+                    {clean_actions if clean_actions.strip() else "No specific actions detected."}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -183,7 +194,7 @@ if choice == "🚀 Meeting Summary":
             for m in st.session_state.messages:
                 with st.chat_message(m["role"]): st.markdown(m["content"])
 
-        if p := st.chat_input("Ask about the meeting transcript..."):
+        if p := st.chat_input("Ask about the meeting details..."):
             st.session_state.messages.append({"role": "user", "content": p})
             with chat_container:
                 with st.chat_message("user"): st.markdown(p)
@@ -194,15 +205,15 @@ if choice == "🚀 Meeting Summary":
 
 # --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
-    st.markdown('<div class="hero-banner"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-banner" style="padding:2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
-    if not data: st.info("History is empty.")
+    if not data: st.info("History is currently empty.")
     else:
         for row in data:
-            with st.expander(f"📅 {row[1]} | {row[2]}"):
-                st.write(f"Summary: {row[4]}")
-                st.write(f"Actions: {row[5]}")
-                if st.button("Delete", key=f"d_{row[0]}"): 
+            with st.expander(f"📅 {row[1]} | {row[2]} ({row[3]})"):
+                st.write(f"**Summary:** {row[4]}")
+                st.write(f"**Actions:** {row[5]}")
+                if st.button("Delete Permanent", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
