@@ -34,26 +34,31 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2.1 STABLE HUGGING FACE LOGIC (Bypassing Gemini 404) ---
+# --- 2.1 STABLE AI LOGIC (Updated to Mistral v0.3 to fix 410 Error) ---
 def ask_ai_assistant(transcript, user_query):
     if "HF_TOKEN" not in st.secrets:
         return "Error: HF_TOKEN missing in Streamlit Secrets."
     
-    API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
-    headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+    api_key = st.secrets["HF_TOKEN"]
+    # Updated URL to v0.3 (Stable Version)
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+    
+    headers = {"Authorization": f"Bearer {api_key}"}
     
     prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer briefly based on context: [/INST]</s>"
     payload = {"inputs": prompt, "parameters": {"max_new_tokens": 150, "return_full_text": False}}
     
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=20)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=25)
         if response.status_code == 200:
             result = response.json()
             return result[0]['generated_text'].strip()
+        elif response.status_code == 503:
+            return "AI model is loading on Hugging Face servers. Please wait 20 seconds and try again."
         else:
-            return f"AI is busy (Error {response.status_code}). Try again in 5 seconds."
-    except:
-        return "Connection busy. Please retry."
+            return f"AI Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Connection failed: {str(e)}"
 
 # --- 3. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Assistant", layout="wide", page_icon="💼")
@@ -79,7 +84,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LONG-FORM AUDIO PROCESSING ---
+# --- 4. AUDIO PROCESSING ---
 def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
@@ -128,11 +133,9 @@ if choice == "🚀 Meeting Summary":
                     tmp.write(file.getvalue())
                     raw_text = transcribe_long_audio(tmp.name)
                 
-                # Action items extraction
                 p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
-                # Summarization (BART)
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:3000], return_tensors="pt", max_length=1024, truncation=True)
@@ -146,7 +149,6 @@ if choice == "🚀 Meeting Summary":
                 conn.commit()
                 conn.close()
 
-                # CRITICAL: Saving 'actions' to session_state
                 st.session_state.update({
                     'summary': summary, 
                     'actions': actions, 
@@ -156,7 +158,7 @@ if choice == "🚀 Meeting Summary":
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- RESULTS DISPLAY (Fixed Side-by-Side Cards) ---
+    # --- RESULTS DISPLAY ---
     if 'summary' in st.session_state:
         st.divider()
         st.markdown(f"### 🎯 Session Insights")
@@ -171,7 +173,6 @@ if choice == "🚀 Meeting Summary":
             """, unsafe_allow_html=True)
 
         with col2:
-            # Fixed KeyError: Safe check for 'actions'
             raw_actions = st.session_state.get('actions', 'No specific actions detected.')
             clean_actions = raw_actions.replace('•', '<br>•')
             
@@ -194,7 +195,7 @@ if choice == "🚀 Meeting Summary":
             for m in st.session_state.messages:
                 with st.chat_message(m["role"]): st.markdown(m["content"])
 
-        if p := st.chat_input("Ask about the meeting details..."):
+        if p := st.chat_input("Ask about the meeting..."):
             st.session_state.messages.append({"role": "user", "content": p})
             with chat_container:
                 with st.chat_message("user"): st.markdown(p)
@@ -203,19 +204,17 @@ if choice == "🚀 Meeting Summary":
                     st.markdown(ans)
                     st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- TAB 2: ARCHIVES ---
+# --- ARCHIVES ---
 elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding:2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
-    if not data: st.info("History is currently empty.")
+    if not data: st.info("History is empty.")
     else:
         for row in data:
-            with st.expander(f"📅 {row[1]} | {row[2]} ({row[3]})"):
-                st.write(f"**Summary:** {row[4]}")
-                st.write(f"**Actions:** {row[5]}")
+            with st.expander(f"📅 {row[1]} | {row[2]}"):
+                st.write(f"Summary: {row[4]}")
+                st.write(f"Actions: {row[5]}")
                 if st.button("Delete Permanent", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
-
-
