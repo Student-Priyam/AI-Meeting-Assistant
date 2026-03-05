@@ -8,7 +8,7 @@ except ImportError:
 
 import streamlit as st
 import whisper
-import google.generativeai as genai  # FOR CHATBOT
+import requests  # Added for stable direct API calls
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import re
 import os
@@ -38,15 +38,32 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2.1 AI CONFIGURATION (FOR CHATBOT) ---
-# Ensure "GEMINI_API_KEY" is added in Streamlit Cloud Secrets
-if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # 'models/' prefix hata kar direct try karein agar library update kar di hai toh
-    # Nayi library ke saath sirf model name kaafi hai
-    gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    st.error("⚠️ API Key missing! Go to Settings > Secrets and add GEMINI_API_KEY.")
+# --- 2.1 STABLE DIRECT CHATBOT LOGIC ---
+def ask_gemini_direct(transcript, user_query):
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "Error: API Key missing in Secrets."
+    
+    api_key = st.secrets["GEMINI_API_KEY"]
+    # Direct endpoint to bypass library 404 issues
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "contents": [{
+            "parts": [{
+                "text": f"You are a meeting assistant. Use this transcript to answer strictly: {transcript}\n\nQuestion: {user_query}"
+            }]
+        }]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"AI Error {response.status_code}: {response.text}"
+    except Exception as e:
+        return f"Connection failed: {str(e)}"
 
 # --- 3. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Assistant", layout="wide", page_icon="💼")
@@ -86,36 +103,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LONG-FORM AUDIO PROCESSING (CHUNKING) ---
+# --- 4. LONG-FORM AUDIO PROCESSING ---
 def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
-    
-    # 5-minute chunks
     chunk_length = 5 * 60 * 1000 
     chunks = [audio[i:i + chunk_length] for i in range(0, len(audio), chunk_length)]
-    
     full_transcript = ""
-    progress_text = st.empty()
     progress_bar = st.progress(0)
-    
     for i, chunk in enumerate(chunks):
-        progress_text.text(f"Processing segment {i+1} of {len(chunks)}...")
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_chunk:
             chunk.export(tmp_chunk.name, format="wav")
             result = model.transcribe(tmp_chunk.name)
             full_transcript += result["text"] + " "
             os.remove(tmp_chunk.name)
         progress_bar.progress((i + 1) / len(chunks))
-    
     return full_transcript
 
 # --- 5. NAVIGATION ---
 with st.sidebar:
     st.markdown("<h2 style='text-align:center; font-weight:700;'>STRATEGIC MINUTES</h2>", unsafe_allow_html=True)
-    st.markdown("<hr style='border-color:#334155'>", unsafe_allow_html=True)
     m_type = st.selectbox("Meeting Classification", ["Corporate Meeting", "Academic Class", "Technical Sync"])
-    st.markdown("---")
     choice = st.radio("Navigation", ["🚀 Meeting Summary", "📅 Meeting Archives"], label_visibility="collapsed")
 
 # --- TAB 1: INTELLIGENCE SUITE ---
@@ -124,11 +132,10 @@ if choice == "🚀 Meeting Summary":
     <div class="hero-banner">
         <div style="margin-bottom: 1.5rem;">
             <img src="https://images.unsplash.com/photo-1616531770192-6eaea74c2456?auto=format&fit=crop&q=60&w=1200" 
-                 style="border-radius:12px; max-width:600px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
+                 style="border-radius:12px; max-width:600px; shadow: 0 4px 15px rgba(0,0,0,0.3);"/>
         </div>
         <h1>Missed a meeting? No need to rewatch it.</h1>
         <h2>{m_type} Intelligence Mode</h2>
-        <p>Optimized for long-form sessions up to 60 minutes.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -140,7 +147,7 @@ if choice == "🚀 Meeting Summary":
         if not title:
             st.warning("Please specify a session title.")
         else:
-            with st.spinner(f"Decoding long-form {m_type} context..."):
+            with st.spinner("Decoding Context..."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                     tmp.write(file.getvalue())
                     tmp_path = tmp.name
@@ -150,11 +157,11 @@ if choice == "🚀 Meeting Summary":
 
                 st.session_state['current_transcript'] = raw_text
                 
-                # Action items extraction
+                # Extraction
                 p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
-                # Summarization (BART)
+                # Summarization
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:3500], return_tensors="pt", max_length=1024, truncation=True)
@@ -168,50 +175,29 @@ if choice == "🚀 Meeting Summary":
                 conn.commit()
                 conn.close()
 
-                st.session_state['summary'] = summary
-                st.session_state['actions'] = actions
-                st.session_state['ts'] = ts
-                st.session_state['active_mode'] = m_type
-                st.session_state['title_saved'] = title
+                st.session_state.update({'summary': summary, 'actions': actions, 'ts': ts, 'active_mode': m_type, 'title_saved': title})
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- RESULTS SECTION ---
     if 'summary' in st.session_state:
         st.divider()
-        st.markdown(f"### 🎯 Strategic Insights: {st.session_state.get('active_mode', m_type)}")
-        
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.markdown(f"""
-            <div style="background-color: #EBF5FF; padding: 20px; border-radius: 10px; border-left: 5px solid #3B82F6; height: 100%;">
-                <h4 style="color: #1E40AF; margin-top: 0;">📝 Executive Summary</h4>
-                <p style="color: #1E3A8A; line-height: 1.6;">{st.session_state['summary']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("#### 📝 Executive Summary")
+            st.info(st.session_state['summary'])
 
         with col2:
-            raw_actions = st.session_state['actions'].split('•')
-            clean_actions = "".join([f"<li style='margin-bottom: 8px;'>{a.strip()}</li>" for a in raw_actions if len(a.strip()) > 10])
-            st.markdown(f"""
-            <div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; height: 100%;">
-                <h4 style="color: #166534; margin-top: 0;">🚀 Key Deliverables</h4>
-                <ul style="color: #14532D; padding-left: 20px; line-height: 1.5;">
-                    {clean_actions}
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown("#### 🚀 Key Deliverables")
+            st.success(st.session_state['actions'] if st.session_state['actions'] else "No specific actions detected.")
 
-        # --- SMART CHATBOT SECTION ---
+        # --- CHATBOT SECTION (Direct Request Method) ---
         st.markdown("---")
         st.markdown("### 🤖 Chat with AI Assistant")
-        st.caption("Aap is meeting ke context mein koi bhi sawal puch sakte hain.")
-
+        
         if "messages" not in st.session_state:
             st.session_state.messages = []
 
-        # Chat display container
-        chat_container = st.container(height=350)
+        chat_container = st.container(height=300)
         with chat_container:
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
@@ -224,51 +210,25 @@ if choice == "🚀 Meeting Summary":
                     st.markdown(prompt)
                 
                 with st.chat_message("assistant"):
-                    # Context prompt for high accuracy
-                    context_query = f"""
-                    Transcript: {st.session_state['current_transcript']}
-                    
-                    User Question: {prompt}
-                    
-                    Instruction: Answer strictly based on the transcript provided. If you cannot find the answer, say you don't know.
-                    """
-                    try:
-                        response = gemini_model.generate_content(context_query)
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e:
-                        # DEBUG: Ye line aapko batayegi ki problem kya hai
-                        st.error(f"AI Error: {e}")
+                    # Using the stable direct bypass function
+                    answer = ask_gemini_direct(st.session_state['current_transcript'], prompt)
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-        # --- DOWNLOAD REPORT ---
         st.divider()
-        report_content = f"STRATEGIC INTELLIGENCE REPORT\nTITLE: {st.session_state.get('title_saved')}\nDATE: {st.session_state['ts']}\n\nSUMMARY:\n{st.session_state['summary']}\n\nTRANSCRIPT:\n{st.session_state['current_transcript']}"
-        st.download_button(
-            label="📥 Download Full Report (.txt)",
-            data=report_content,
-            file_name=f"Report_{st.session_state.get('title_saved')}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+        st.download_button("📥 Download Report (.txt)", f"Report: {st.session_state.get('title_saved')}\n\n{st.session_state['summary']}", use_container_width=True)
 
 # --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
-    st.markdown('<div class="hero-banner" style="padding: 2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-banner"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
     data = conn.execute("SELECT id, date, title, type, summary, actions FROM archives ORDER BY id DESC").fetchall()
-    if not data: 
-        st.info("Historical archives are currently empty.")
+    if not data: st.info("Historical archives are currently empty.")
     else:
         for row in data:
             with st.expander(f"📅 {row[1]} | {row[2]} ({row[3]})"):
                 st.write(f"**Summary:** {row[4]}")
                 st.write(f"**Action Items:** {row[5]}")
                 if st.button("Delete", key=f"d_{row[0]}"): 
-                    delete_record(row[0])
-                    st.rerun()
+                    delete_record(row[0]); st.rerun()
     conn.close()
-
-
-
-
-
