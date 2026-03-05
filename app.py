@@ -41,26 +41,36 @@ def ask_gemini_direct(transcript, user_query):
     
     api_key = st.secrets["GEMINI_API_KEY"]
     
-    # Using 'gemini-1.5-flash' with the stable v1 endpoint
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Try multiple endpoints to bypass 404
+    endpoints = [
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}",
+        f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+    ]
     
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
             "parts": [{
-                "text": f"You are a helpful assistant. Use this meeting transcript context: {transcript}\n\nQuestion: {user_query}\n\nProvide a clear answer strictly based on the context."
+                "text": f"Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer strictly based on the context."
             }]
         }]
     }
     
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"AI Error {response.status_code}: Please check your API key or model access."
-    except Exception as e:
-        return f"Connection failed: {str(e)}"
+    last_error = ""
+    for url in endpoints:
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                last_error = f"Status {response.status_code}: {response.text}"
+                continue # Try next endpoint
+        except Exception as e:
+            last_error = str(e)
+            continue
+            
+    return f"AI Assistant is currently unavailable. (Debug: {last_error})"
 
 # --- 3. PREMIUM UI/UX CONFIG ---
 st.set_page_config(page_title="Strategic Intel | AI Assistant", layout="wide", page_icon="💼")
@@ -186,3 +196,4 @@ elif choice == "📅 Meeting Archives":
                 if st.button("Delete", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
+
