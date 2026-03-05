@@ -43,6 +43,7 @@ init_db()
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     # 'models/' prefix hata kar direct try karein agar library update kar di hai toh
+    # Nayi library ke saath sirf model name kaafi hai
     gemini_model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     st.error("⚠️ API Key missing! Go to Settings > Secrets and add GEMINI_API_KEY.")
@@ -266,6 +267,7 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
+
 
 
 
