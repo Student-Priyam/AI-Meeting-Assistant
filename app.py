@@ -39,8 +39,7 @@ def ask_ai_assistant(transcript, user_query):
     if "HF_TOKEN" not in st.secrets:
         return "Error: HF_TOKEN missing in Streamlit Secrets."
     
-    # Mistral v0.3 ya Llama-3 use karein jo zyada stable hain
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+    API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
     headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
     
     prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer briefly based on context: [/INST]</s>"
@@ -218,4 +217,5 @@ elif choice == "📅 Meeting Archives":
                 if st.button("Delete Permanent", key=f"d_{row[0]}"): 
                     delete_record(row[0]); st.rerun()
     conn.close()
+
 
