@@ -34,16 +34,17 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2.1 STABLE AI LOGIC (ROUTER URL FIX) ---
+# --- 2.1 STABLE AI LOGIC (ROUTING FIX FOR 404) ---
 def ask_ai_assistant(transcript, user_query):
     if "HF_TOKEN" not in st.secrets:
         return "Error: HF_TOKEN missing in Streamlit Secrets."
     
     api_key = st.secrets["HF_TOKEN"]
-    # Updated Router URL
-    API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3"
+    # Using the most reliable direct inference endpoint
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
     
     headers = {"Authorization": f"Bearer {api_key}"}
+    # Standard Instruct format for Mistral
     prompt = f"<s>[INST] Context: {transcript}\n\nQuestion: {user_query}\n\nAnswer briefly: [/INST]</s>"
     payload = {"inputs": prompt, "parameters": {"max_new_tokens": 150, "return_full_text": False}}
     
@@ -52,8 +53,10 @@ def ask_ai_assistant(transcript, user_query):
         if response.status_code == 200:
             result = response.json()
             return result[0]['generated_text'].strip()
+        elif response.status_code == 503:
+            return "AI model is currently loading on Hugging Face. Please try again in 20 seconds."
         else:
-            return f"AI Error {response.status_code}: {response.text}"
+            return f"AI Error {response.status_code}: Model endpoint issue. Check if HF_TOKEN is correct."
     except Exception as e:
         return f"Connection failed: {str(e)}"
 
@@ -74,10 +77,6 @@ st.markdown("""
         box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
     }
     .hero-banner h1 { font-size: 2.8rem; font-weight: 700; color: white !important; }
-    .executive-card {
-        background: white; padding: 2.5rem; border-radius: 12px; border: 1px solid #E2E8F0; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem; 
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -125,24 +124,32 @@ if choice == "🚀 Meeting Summary":
         if not title:
             st.warning("Please specify a session title.")
         else:
-            with st.spinner("Decoding Meeting Context..."):
+            with st.spinner("Analyzing Meeting Content..."):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
                     tmp.write(file.getvalue())
                     raw_text = transcribe_long_audio(tmp.name)
                 
+                # Action items
                 p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
+                # Summarization (BART)
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:3000], return_tensors="pt", max_length=1024, truncation=True)
                 sum_ids = s_model.generate(inputs["input_ids"], max_length=150)
                 summary = tokenizer.decode(sum_ids[0], skip_special_tokens=True)
 
-                st.session_state.update({'summary': summary, 'actions': actions, 'current_transcript': raw_text, 'title_saved': title})
+                st.session_state.update({
+                    'summary': summary, 
+                    'actions': actions, 
+                    'current_transcript': raw_text, 
+                    'title_saved': title
+                })
                 st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # --- RESULTS DISPLAY ---
     if 'summary' in st.session_state:
         st.divider()
         col1, col2 = st.columns(2)
@@ -171,7 +178,6 @@ if choice == "🚀 Meeting Summary":
             st.session_state.messages.append({"role": "user", "content": p})
             with chat_container:
                 with st.chat_message("user"): st.markdown(p)
-                # FIXED SYNTAX HERE
                 with st.chat_message("assistant"):
                     ans = ask_ai_assistant(st.session_state['current_transcript'], p)
                     st.markdown(ans)
@@ -180,4 +186,3 @@ if choice == "🚀 Meeting Summary":
 # --- ARCHIVES ---
 elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding:2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
-    # Database logic remains same
