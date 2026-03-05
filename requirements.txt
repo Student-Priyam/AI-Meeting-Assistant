@@ -1,14 +1,8 @@
 streamlit
 openai-whisper
-google-generativeai
 transformers
 pydub
 reportlab
 torch
 audioop-lts
 requests
-
-
-
-
-
