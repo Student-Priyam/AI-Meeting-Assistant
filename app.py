@@ -42,8 +42,8 @@ init_db()
 # Ensure "GEMINI_API_KEY" is added in Streamlit Cloud Secrets
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # 'gemini-1.5-flash' ki jagah sirf 'gemini-pro' ya version hatake try karein
-    gemini_model = genai.GenerativeModel('gemini-pro')
+    # Stable version for most API keys
+    gemini_model = genai.GenerativeModel('models/gemini-pro')
 else:
     st.error("⚠️ API Key missing! Go to Settings > Secrets and add GEMINI_API_KEY.")
 
@@ -266,4 +266,5 @@ elif choice == "📅 Meeting Archives":
                     delete_record(row[0])
                     st.rerun()
     conn.close()
+
 
