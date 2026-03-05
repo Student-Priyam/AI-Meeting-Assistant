@@ -1,10 +1,11 @@
 streamlit
 openai-whisper
-google-generativeai
+google-generativeai>=0.7.2
 transformers
 pydub
 reportlab
 torch
 audioop-lts
+
 
 
