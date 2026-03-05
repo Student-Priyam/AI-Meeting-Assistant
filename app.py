@@ -34,14 +34,15 @@ def delete_record(record_id):
 
 init_db()
 
-# --- 2.1 STABLE AI LOGIC (Updated to Mistral v0.3 to fix 410 Error) ---
+# --- 2.1 STABLE AI LOGIC (UPDATED URL TO FIX 410 ERROR) ---
 def ask_ai_assistant(transcript, user_query):
     if "HF_TOKEN" not in st.secrets:
         return "Error: HF_TOKEN missing in Streamlit Secrets."
     
     api_key = st.secrets["HF_TOKEN"]
-    # Updated URL to v0.3 (Stable Version)
-    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+    
+    # FIXED: Updated URL from api-inference to router
+    API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct-v0.3"
     
     headers = {"Authorization": f"Bearer {api_key}"}
     
@@ -53,10 +54,8 @@ def ask_ai_assistant(transcript, user_query):
         if response.status_code == 200:
             result = response.json()
             return result[0]['generated_text'].strip()
-        elif response.status_code == 503:
-            return "AI model is loading on Hugging Face servers. Please wait 20 seconds and try again."
         else:
-            return f"AI Error {response.status_code}: {response.text}"
+            return f"AI Assistant Error {response.status_code}: {response.text}"
     except Exception as e:
         return f"Connection failed: {str(e)}"
 
@@ -84,7 +83,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. AUDIO PROCESSING ---
+# --- 4. AUDIO PROCESSING (WHISPER) ---
 def transcribe_long_audio(file_path):
     model = whisper.load_model("base")
     audio = AudioSegment.from_file(file_path)
@@ -133,9 +132,11 @@ if choice == "🚀 Meeting Summary":
                     tmp.write(file.getvalue())
                     raw_text = transcribe_long_audio(tmp.name)
                 
+                # Action items
                 p = r"([^.]*(?:homework|assignment|deadline|will|must|due|by|tasked|decided)[^.]*\.)"
                 actions = "\n".join([f"• {a.strip()}" for a in re.findall(p, raw_text, re.I)])
 
+                # Summarization
                 tokenizer = AutoTokenizer.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 s_model = AutoModelForSeq2SeqLM.from_pretrained("sshleifer/distilbart-cnn-12-6")
                 inputs = tokenizer("summarize: " + raw_text[:3000], return_tensors="pt", max_length=1024, truncation=True)
@@ -175,7 +176,6 @@ if choice == "🚀 Meeting Summary":
         with col2:
             raw_actions = st.session_state.get('actions', 'No specific actions detected.')
             clean_actions = raw_actions.replace('•', '<br>•')
-            
             st.markdown(f"""
             <div style="background-color: #F0FDF4; padding: 20px; border-radius: 10px; border-left: 5px solid #22C55E; min-height: 250px;">
                 <h4 style="color: #166534; margin-top: 0;">🚀 Key Deliverables</h4>
@@ -199,12 +199,12 @@ if choice == "🚀 Meeting Summary":
             st.session_state.messages.append({"role": "user", "content": p})
             with chat_container:
                 with st.chat_message("user"): st.markdown(p)
-                with st.chat_message("assistant"):
+                with chat_h_assistant := st.chat_message("assistant"):
                     ans = ask_ai_assistant(st.session_state['current_transcript'], p)
                     st.markdown(ans)
                     st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- ARCHIVES ---
+# --- TAB 2: ARCHIVES ---
 elif choice == "📅 Meeting Archives":
     st.markdown('<div class="hero-banner" style="padding:2rem;"><h1>Archives Center</h1></div>', unsafe_allow_html=True)
     conn = sqlite3.connect('strategic_intel_v8.db')
