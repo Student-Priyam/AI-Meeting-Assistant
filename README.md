@@ -28,9 +28,9 @@ To prevent the system from crashing on a 55-minute file, the engine implements a
 **Adaptive Workspace Intelligence**
 The platform uses conditional NLP patterns to pivot its focus based on the user's selection:
 
-Corporate Mode: Prioritizes verbs and nouns related to "deadlines," "decisions," and "accountability".
+**Corporate Mode**: Prioritizes verbs and nouns related to "deadlines," "decisions," and "accountability".
 
-Academic Mode: Prioritizes "core concepts," "homework assignments," and "exam prep".
+**Academic Mode**: Prioritizes "core concepts," "homework assignments," and "exam prep".
 
 **Pinpoint Strategic Query Engine**
 Instead of searching through a generic summary, the query engine splits the full transcript into sentence-level entities. When a user asks about "Rahul's role," the AI performs a keyword-weighted scan to jump past the meeting introduction and find the exact sentence where that person was mentioned.
